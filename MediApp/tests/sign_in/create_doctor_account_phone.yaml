@@ -1,0 +1,97 @@
+appId: org.medicus.app
+---
+# Test: Create Doctor Account with Phone Number
+
+- tapOn: Expo Go
+
+- tapOn:
+    text: Medicus
+    index: -1
+
+# Wait for Role Selection Screen
+- extendedWaitUntil:
+    visible: "Welcome to Medicus!"
+    timeout: 90000
+
+# Select Doctor role
+- tapOn: "Doctor"
+
+# Tap Continue as Doctor
+- tapOn: "Continue as Doctor"
+
+# Wait for Sign Up Method Selection
+- extendedWaitUntil:
+    visible: "Choose how to sign up"
+    timeout: 10000
+
+# Select Phone signup method
+- tapOn: "Continue with phone number"
+
+# Wait for Phone Sign Up Form
+- extendedWaitUntil:
+    visible: "Create your account"
+    timeout: 10000
+
+# Enter Phone Number
+- tapOn: "Phone Number"
+- inputText: "5551234567"
+
+# Enter License Number (required for doctors)
+- tapOn: "License Number"
+- inputText: "MD123456789"
+
+# Select Specialty
+- tapOn: "Specialty"
+- tapOn: "Cardiology"
+
+# Enter Password
+- tapOn: "Password"
+- inputText: "TestDoctor123!"
+
+# Enter Confirm Password
+- tapOn: "Confirm Password"
+- inputText: "TestDoctor123!"
+
+# Hide keyboard
+- hideKeyboard
+
+# Tap Continue
+- tapOn: "Continue"
+
+# Wait for Personal Details Form
+- extendedWaitUntil:
+    visible: "Personal details"
+    timeout: 10000
+
+# Enter First Name
+- tapOn: "First Name"
+- inputText: "John"
+
+# Enter Last Name
+- tapOn: "Last Name"
+- inputText: "Smith"
+
+# Enter Date of Birth
+- tapOn: "Date of Birth"
+- inputText: "01/15/1980"
+
+# Select Gender
+- tapOn: "Gender"
+- tapOn: "Male"
+
+# Hide keyboard
+- hideKeyboard
+
+# Take screenshot before creating account
+- takeScreenshot: doctor_account_form_filled
+
+# Tap Create Account
+- tapOn: "Create Account"
+
+# Wait for success or next screen
+- extendedWaitUntil:
+    visible: "Chats"
+    timeout: 30000
+
+# Take screenshot of success
+- takeScreenshot: doctor_account_created

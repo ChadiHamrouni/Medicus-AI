@@ -134,3 +134,5 @@ docker-compose.legacy.yml
 # Archived prompt snapshots
 /MedicusAI/src/assistants/version_control/
 
+# Maestro UI-test run output
+/MediApp/tests/.maestro/screenshots/

@@ -1,0 +1,79 @@
+{
+    "expo":  {
+                 "name":  "Medicus",
+                 "slug":  "mediapp",
+                 "version":  "1.0.0",
+                 "orientation":  "portrait",
+                 "icon":  "./assets/images/taskify.png",
+                 "scheme":  "medicusapp",
+                 "userInterfaceStyle":  "light",
+                 "notification":  {
+                                      "icon":  "./assets/images/taskify.png",
+                                      "color":  "#F05C0C"
+                                  },
+                 "newArchEnabled":  true,
+                 "ios":  {
+                             "supportsTablet":  true,
+                             "bundleIdentifier":  "org.medicus.app",
+                             "runtimeVersion":  "1.0.0",
+                             "infoPlist":  {
+                                               "NSLocationWhenInUseUsageDescription":  "Medicus needs your location to help you find nearby doctors and medical facilities.",
+                                               "NSLocationAlwaysUsageDescription":  "Medicus needs your location to provide better healthcare services.",
+                                               "NSCameraUsageDescription":  "Medicus needs access to your camera to take photos for medical records.",
+                                               "NSPhotoLibraryUsageDescription":  "Medicus needs access to your photo library to upload medical documents.",
+                                               "NSMicrophoneUsageDescription":  "Medicus needs access to your microphone for voice messages and consultations.",
+                                               "NSCalendarsUsageDescription":  "Medicus needs access to your calendar to schedule medical appointments.",
+                                               "NSCalendarsFullAccessUsageDescription":  "Medicus needs full access to your calendar to schedule medical appointments.",
+                                               "ITSAppUsesNonExemptEncryption":  false
+                                           }
+                         },
+                 "android":  {
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/images/adaptive-icon.png",
+                                                      "backgroundColor":  "#ffffff"
+                                                  },
+                                 "package":  "org.medicus.app",
+                                 "runtimeVersion":  "1.0.0"
+                             },
+                 "web":  {
+                             "bundler":  "metro",
+                             "output":  "static",
+                             "favicon":  "./assets/images/favicon.png"
+                         },
+                 "plugins":  [
+                                 "expo-audio",
+                                 "expo-web-browser",
+                                 "expo-router",
+                                 "expo-secure-store",
+                                 "expo-location",
+                                 [
+                                     "expo-media-library",
+                                     {
+                                         "photosPermission":  "Allow Medicus to save images to your photo library.",
+                                         "savePhotosPermission":  "Allow Medicus to save images to your photo library.",
+                                         "isAccessMediaLocationEnabled":  true
+                                     }
+                                 ],
+                                 [
+                                     "expo-splash-screen",
+                                     {
+                                         "image":  "./assets/images/taskify.png",
+                                         "imageWidth":  200,
+                                         "resizeMode":  "contain",
+                                         "backgroundColor":  "#000000"
+                                     }
+                                 ]
+                             ],
+                 "experiments":  {
+                                     "typedRoutes":  true
+                                 },
+                 "extra":  {
+                               "router":  {
+
+                                          }
+                           },
+                 "runtimeVersion":  {
+                                        "policy":  "appVersion"
+                                    }
+             }
+}

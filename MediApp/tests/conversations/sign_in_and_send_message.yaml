@@ -1,0 +1,83 @@
+appId: org.medicus.app
+---
+- tapOn: Expo Go
+
+- tapOn:
+    text: Medicus
+    index: -1
+
+# Tap on the Email or Phone input field
+- extendedWaitUntil:
+    visible: "Email or Phone"
+    timeout: 100000
+
+- tapOn: "Email or Phone"
+
+# Enter the phone number
+- inputText: "xpatient@example.com"
+
+# Tap on the Password field
+- tapOn: "Password"
+
+# Enter the password
+- inputText: "xMedicusDemo123!"
+
+# Hide keyboard before tapping Sign In
+- hideKeyboard
+
+# Tap on the Sign In button
+- tapOn: "Sign In"
+
+# Wait for the conversations screen to load after sign in
+- extendedWaitUntil:
+    visible: "Chats"
+    timeout: 90000
+
+# Step 2: Select a conversation
+# Tap on the Sara health assistant conversation (always available)
+- tapOn:
+    text: "Sara - your Health Assistant"
+
+# Wait for the chat screen to load
+- extendedWaitUntil:
+    visible:
+      id: "message-input"
+    timeout: 5000
+
+# Step 3: Send a message
+# Tap on the message input field
+- tapOn:
+    id: "message-input"
+
+# Type a test message
+- inputText: "Hi"
+
+# Tap the send button (try id first, fallback to point if needed)
+- tapOn:
+    id: "send-button"
+    optional: true
+- tapOn:
+    point: "95%,85%"
+    optional: true
+
+# Verify the message was sent (it should appear in the chat)
+- assertVisible:
+    text: "Hi"
+    enabled: true
+
+# Wait for Sara's response (adjust timeout based on typical response time)
+- extendedWaitUntil:
+    visible:
+      id: "sara-message-bubble"
+    timeout: 30000
+
+# Take a screenshot of the conversation for regression testing
+- takeScreenshot: sara_response
+
+# Copy Sara's response text (stored in maestro.copiedText automatically)
+- copyTextFrom:
+    id: "sara-response-text"
+
+# Generate test report (maestro.copiedText is available in the script)
+- runScript:
+    file: report.js

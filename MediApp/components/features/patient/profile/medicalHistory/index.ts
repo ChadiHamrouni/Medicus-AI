@@ -1,0 +1,1 @@
+export { MedicalHistory } from './MedicalHistory';

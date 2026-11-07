@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="16" id="video">
+  <g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" transform="translate(1 1)">
+    <path d="m22 2-7 5 7 5z"></path>
+    <rect width="15" height="14" rx="2"></rect>
+  </g>
+</svg>

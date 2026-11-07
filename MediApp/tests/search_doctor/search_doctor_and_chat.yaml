@@ -1,0 +1,131 @@
+appId: org.medicus.app
+---
+# Test: Search for a Doctor, Start Conversation, Send Message, Expect Response
+
+- tapOn: Expo Go
+
+- tapOn:
+    text: Medicus
+    index: -1
+
+# Wait for Sign In screen
+- extendedWaitUntil:
+    visible: "Email or Phone"
+    timeout: 100000
+
+# Sign in as patient
+- tapOn: "Email or Phone"
+- inputText: "xpatient@example.com"
+
+- tapOn: "Password"
+- inputText: "xMedicusDemo123!"
+
+- hideKeyboard
+
+- tapOn: "Sign In"
+
+# Wait for Chats screen to load
+- extendedWaitUntil:
+    visible: "Chats"
+    timeout: 90000
+
+# Tap on the floating action button (+ button) to start new conversation
+# This navigates to Find Doctors screen
+- tapOn:
+    text: "Start Conversation"
+    optional: true
+
+# If no Start Conversation text, try tapping the + button area (bottom right)
+- tapOn:
+    point: "90%,90%"
+    optional: true
+
+# Wait for Find Doctors screen
+- extendedWaitUntil:
+    visible: "Find Doctors"
+    timeout: 10000
+
+# Take screenshot of Find Doctors screen
+- takeScreenshot: find_doctors_screen
+
+# Tap on specialty selector to open dropdown
+- tapOn: "Select specialty..."
+
+# Wait for specialty dropdown to load
+- extendedWaitUntil:
+    visible: "Search specialties..."
+    timeout: 5000
+
+# Search for a specialty (e.g., Cardiology)
+- tapOn: "Search specialties..."
+- inputText: "Cardiology"
+
+# Select Cardiology from results
+- tapOn: "Cardiology"
+
+# Tap Search Doctors button
+- tapOn: "Search Doctors"
+
+# Wait for search results
+- extendedWaitUntil:
+    visible: "Available Doctors"
+    timeout: 30000
+
+# Take screenshot of search results
+- takeScreenshot: doctor_search_results
+
+# Tap on the first doctor card to expand it
+- tapOn:
+    text: "Dr."
+    index: 0
+
+# Wait for Start Conversation button to appear
+- extendedWaitUntil:
+    visible: "Start Conversation"
+    timeout: 5000
+
+# Tap Start Conversation
+- tapOn: "Start Conversation"
+
+# Wait for chat screen to load (message input should be visible)
+- extendedWaitUntil:
+    visible:
+      id: "message-input"
+    timeout: 10000
+
+# Take screenshot of new conversation
+- takeScreenshot: new_doctor_conversation
+
+# Tap on message input
+- tapOn:
+    id: "message-input"
+
+# Type a message to the doctor
+- inputText: "Hello Doctor, I would like to schedule a consultation regarding my heart health."
+
+# Tap send button
+- tapOn:
+    id: "send-button"
+    optional: true
+
+# Fallback to tapping send button area
+- tapOn:
+    point: "95%,85%"
+    optional: true
+
+# Verify message was sent
+- assertVisible:
+    text: "Hello Doctor"
+    enabled: true
+
+# Take screenshot after sending message
+- takeScreenshot: message_sent_to_doctor
+
+# Wait for doctor's response (this may take longer or may be automated/manual)
+# Adjust timeout based on whether there's auto-response
+- extendedWaitUntil:
+    visible: "Dr."
+    timeout: 60000
+
+# Take final screenshot
+- takeScreenshot: doctor_conversation_complete
