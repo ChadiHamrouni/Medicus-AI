@@ -1,0 +1,11 @@
+# MedicusAI service. Install the shared library first, from the repository root:
+#   pip install "./MedicusCommon[ai]" ./MedicusNotification/sdk
+# Add "[litellm]" for Anthropic/Gemini/Bedrock/... and "[s3]" or "[azure]" for remote storage.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-dotenv>=1.0
+python-multipart>=0.0.9
+httpx>=0.27
+redis>=5.0
+PyMuPDF>=1.24
+pydub>=0.25

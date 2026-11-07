@@ -1,0 +1,95 @@
+{
+"llms": {     
+        "tools_llm": {
+            "model": "gpt-5-mini",
+            "temperature": 0.0,
+            "max_tokens": 2048
+        },
+        "guardrail_llm": {
+            "model": "gpt-4.1-nano",
+            "temperature": 0.0,
+            "max_tokens": 128
+        },           
+        "text_llm": {
+            "model": "gpt-5-nano",
+            "temperature": 0.3,
+            "max_tokens": 2048
+        },    
+        "triage_llm": {
+            "model": "gpt-5-nano",
+            "temperature": 0.0,
+            "max_tokens": 1024
+        },        
+        "vision_llm": {
+            "model": "o1"
+        },          
+        "lab_llm": {
+            "model": "gpt-5.2"
+        },  
+        "doc_llm": {
+            "model": "gpt-5-mini"
+        },                  
+        "stt_llm": {
+            "model": "whisper-1",
+            "temperature": 0.4,
+            "max_tokens": 1024
+        }, 
+        "tts_llm": {
+            "model": "gpt-4o-mini-tts"
+        },
+        "rtc_llm": {
+            "model": "gpt-realtime-mini",
+            "temperature": 0.4,
+            "max_tokens": 1024,
+            "voice": "sage"
+        },                        
+        "table_llm": {
+            "model": "llama-4-8b-instruct",
+            "temperature": 0.1,
+            "max_tokens": 2048
+        }
+    },    
+    
+    "embeddings": {
+        "text_embedding": {
+            "model": "text-embedding-3-small",
+            "dimension": 1536
+        },
+        "video_embedding": {
+            "model": "",
+            "dimension": 1536
+        },
+        "sound_embedding": {
+            "model": "",
+            "dimension": 1536
+        }
+    },
+
+    "retrieval": {
+        "top_k": 7,
+        "similarity_threshold": 0.5
+    },
+
+    "ingestion": {
+        "gen_chunk_size": 2000,
+        "gen_overlap": 200,
+        "retriever_chunk_size": 200,
+        "retriever_overlap": 20
+    },
+    "supported_extensions": ["pdf", "txt", "docx", "doc", "md", "ppt", "jpg", "jpeg", "png"],
+
+    "conversation": {
+        "k_previous_interactions": 5,
+        "memory_buffer_size": 10,
+        "messages_page_size": 50
+    },
+
+    "tool_token_counter":{
+        "model":"o200k_base"
+    },
+
+    "bloom_filter": {
+        "expected_elements": 1000000,
+        "error_rate": 0.01
+    }
+}

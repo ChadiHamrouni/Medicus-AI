@@ -1,0 +1,16 @@
+{
+  "REGION_BUCKETS": {
+    "nam": "medicus_nam",
+    "eur": "medicus_eur",
+    "apac": "medicus_apac",
+    "mena": "medicus_mena",
+    "sam": "medicus_sam"
+  },
+  "COUNTRY_TO_REGION": {
+    "us": "nam",
+    "uk": "eur",
+    "jpn": "apac",
+    "tun": "mena",
+    "bra": "sam"
+  }
+}

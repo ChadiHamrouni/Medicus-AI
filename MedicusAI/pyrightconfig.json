@@ -1,0 +1,7 @@
+{
+  "extraPaths": [
+    "../MedicusCommon"
+  ],
+  "venvPath": "/Users/hassendhrif/miniconda3",
+  "venv": "."
+}

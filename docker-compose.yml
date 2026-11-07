@@ -1,0 +1,163 @@
+# Medicus: full stack for local development and self-hosting.
+#
+#   cp .env.example .env        # then set JWT_SECRET_KEY, INTERNAL_API_KEY and your LLM provider
+#   docker compose up -d --build
+#   docker compose --profile demo run --rm seed-demo     # optional demo accounts
+#
+# API gateway:  http://localhost:8080   (point the mobile app here)
+# Mailpit UI:   http://localhost:8025   (every email the stack sends in development)
+# Local LLM:    docker compose --profile ollama up -d     (see docs/llm-providers.md)
+
+x-service-env: &service-env
+  env_file: .env
+  environment:
+    POSTGRES_HOST: postgres
+    POSTGRES_PORT: "5432"
+    REDIS_URL: redis://redis:6379/0
+    STORAGE_LOCAL_PATH: /data/storage
+    CONVO_SERVICE_URL: http://convo:8003
+    NOTIFICATION_SERVICE_URL: http://notification:8004
+    AI_API_URL: http://ai:8000
+  # Lets containers reach services on the host (e.g. a native Ollama install) on Linux too;
+  # Docker Desktop (macOS/Windows) provides host.docker.internal already.
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  restart: unless-stopped
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_started
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medicus}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-medicus}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    image: amacneil/dbmate:2.28
+    command: ["--wait", "--no-dump-schema", "--migrations-dir", "/db/migrations", "up"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-medicus}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medicus}?sslmode=disable
+    volumes:
+      - ./database:/db:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    image: postgres:16-alpine
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-q", "-f", "/db/seeds/01_reference.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-medicus}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-medicus}
+    volumes:
+      - ./database:/db:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  seed-demo:
+    profiles: ["demo"]
+    image: postgres:16-alpine
+    command: ["psql", "-v", "ON_ERROR_STOP=1", "-q", "-f", "/db/seeds/02_demo.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-medicus}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-medicus}
+    volumes:
+      - ./database:/db:ro
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+
+  user:
+    <<: *service-env
+    build:
+      context: .
+      dockerfile: MedicusUser/Dockerfile
+      args:
+        COMMON_EXTRAS: ${COMMON_EXTRAS:-}
+    volumes:
+      - storage:/data/storage
+
+  convo:
+    <<: *service-env
+    build:
+      context: .
+      dockerfile: MedicusConvo/Dockerfile
+      args:
+        COMMON_EXTRAS: ${COMMON_EXTRAS:-}
+    volumes:
+      - storage:/data/storage
+
+  ai:
+    <<: *service-env
+    build:
+      context: .
+      dockerfile: MedicusAI/Dockerfile
+      args:
+        COMMON_EXTRAS: ${AI_COMMON_EXTRAS:-ai}
+    volumes:
+      - storage:/data/storage
+
+  notification:
+    <<: *service-env
+    build:
+      context: .
+      dockerfile: MedicusNotification/Dockerfile
+      args:
+        COMMON_EXTRAS: ${COMMON_EXTRAS:-}
+
+  gateway:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    depends_on:
+      - user
+      - convo
+      - ai
+      - notification
+    restart: unless-stopped
+
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:0.6.8
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  storage:
+  ollama-data:

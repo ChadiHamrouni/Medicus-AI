@@ -1,0 +1,19 @@
+# .dockerignore for testing with local wheel
+*.pyc
+__pycache__
+.env
+.venv
+*.env
+*.log
+*.sqlite3
+*.db
+*.egg-info
+*.egg
+# *.whl  # Commented out to allow local wheel file
+*.tar.gz
+*.zip
+*.tar
+*.bak
+*.swp
+*.swo
+*.DS_Store

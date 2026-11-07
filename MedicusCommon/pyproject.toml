@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "medicus-common"
+version = "2.0.0"
+description = "Shared models, configuration, database access, auth, storage and LLM abstractions for the Medicus services"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: FastAPI",
+    "Framework :: AsyncIO",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "fastapi>=0.110",
+    "pydantic[email]>=2.6",
+    "pydantic-settings>=2.7",
+    "asyncpg>=0.29",
+    "python-jose[cryptography]>=3.3",
+    "PyJWT>=2.8",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt==4.0.1",
+    "cryptography>=42",
+    "redis>=5.0",
+    "httpx>=0.27",
+    "python-dateutil>=2.8",
+    "phonenumbers>=8.13",
+    "openai>=1.99",
+]
+
+[project.optional-dependencies]
+# Agent runtime used by the AI service.
+ai = ["openai-agents>=0.24,<0.25"]
+# Anthropic, Gemini, Bedrock, Mistral... through LiteLLM (LLM_PROVIDER=litellm).
+litellm = ["openai-agents[litellm]>=0.24,<0.25", "litellm>=1.60"]
+# STORAGE_BACKEND=s3 (AWS S3, MinIO, Cloudflare R2, Backblaze B2...).
+s3 = ["boto3>=1.34"]
+# STORAGE_BACKEND=azure and EMAIL_BACKEND=azure.
+azure = ["azure-storage-blob>=12.19", "aiohttp>=3.9", "azure-communication-email>=1.0"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/your-org/medicus"
+
+[tool.setuptools.packages.find]
+include = ["medicus_common*"]
+
+[tool.setuptools.package-data]
+medicus_common = ["py.typed", "core/*.json"]
+
+[tool.setuptools.exclude-package-data]
+"*" = [".env", "*.env"]
