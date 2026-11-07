@@ -75,37 +75,12 @@ async def _persist_and_broadcast(payload, ai_text, transcription):
         logger.warning(f"MediVox Background Task Failed: {e}")
 
 
+UNCLEAR_VOICE_REPLY = ("I couldn't make out that voice message. Could you record it again "
+                       "in a quieter place, or type your question?")
+
+
 async def _save_empty_transcription_placeholder(payload):
-    """Save a placeholder user message when transcription fails/is empty."""
-    try:
-        user_content = {
-            "type": "app",
-            "text_io": "[Voice message - audio unclear]",
-            "audio_io": payload.audio_io,
-            "assistant": payload.assistant
-        }
-        await ConvoService.add_convo_message(
-            convo_id=payload.convo_id,
-            role="user",
-            content_body=user_content,
-        )
-    except Exception as e:
-        logger.warning(f"Failed to save empty transcription placeholder: {e}")
-        
-        
-async def _save_empty_transcription_placeholder(payload):
-    """Save a placeholder user message when transcription fails/is empty."""
-    try:
-        user_content = {
-            "type": "app",
-            "text_io": "[Voice message - audio unclear]",
-            "audio_io": payload.audio_io,
-            "assistant": payload.assistant
-        }
-        await ConvoService.add_convo_message(
-            convo_id=payload.convo_id,
-            role="user",
-            content_body=user_content,
-        )
-    except Exception as e:
-        logger.warning(f"Failed to save empty transcription placeholder: {e}")
+    """Transcription failed or was empty: show the voice note with a placeholder text and
+    answer it, through the same path as a normal voice message (saved and broadcast, so
+    the app's pending bubble resolves)."""
+    await _persist_and_broadcast(payload, UNCLEAR_VOICE_REPLY, "[Voice message - audio unclear]")

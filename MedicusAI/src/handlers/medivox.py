@@ -30,6 +30,10 @@ AGENT_MAP = {
 }
 
 
+VOICE_FAILURE_REPLY = ("Sorry, I couldn't process your voice message just now. "
+                       "Please try again in a moment, or type your question.")
+
+
 async def medivox_handler(payload: AppPayload, redis=None) -> Tuple[CloudPayload, float]:
     """
     Voice handler: parallelises transcription + context retrieval.
@@ -37,6 +41,7 @@ async def medivox_handler(payload: AppPayload, redis=None) -> Tuple[CloudPayload
     import time
     t_start = time.time()
 
+    transcription = None
     try:
         convo_status_str = payload.convo_status.value if hasattr(payload.convo_status, 'value') else str(
             payload.convo_status)
@@ -143,5 +148,11 @@ async def medivox_handler(payload: AppPayload, redis=None) -> Tuple[CloudPayload
 
     except Exception as exc:
         logger.error(f"[MEDIVOX] Handler failure: {exc}", exc_info=True)
+        # The app shows the voice note as pending until the server saves it: always save
+        # the transcript (or a placeholder) with a reply, even when the assistant failed.
+        if isinstance(transcription, str) and transcription.strip():
+            asyncio.create_task(_persist_and_broadcast(payload, VOICE_FAILURE_REPLY, transcription))
+        else:
+            asyncio.create_task(_save_empty_transcription_placeholder(payload))
         handler_time = time.time() - t_start
         return CloudPayload(status_code=400, message=str(exc)), handler_time

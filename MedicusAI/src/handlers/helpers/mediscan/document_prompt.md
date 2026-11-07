@@ -33,9 +33,5 @@ Important:
 - Extract only what is visible.
 - Preserve formatting where relevant.
 
-Structure your response as:
-
-1. Document Type
-2. Extracted Text
-3. Key Fields
-4. Structured Summary
+Work through the steps above, then write only the final reply, in the reply format
+given at the end of these instructions. Do not show the intermediate steps.

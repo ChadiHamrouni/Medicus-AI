@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import {
   useVaultDocs,
   useSharedDocs,
@@ -216,10 +217,34 @@ const DocumentsTab: React.FC = () => {
     );
   }, [renameDoc, renameText, renameMutation]);
 
-  const handleScan = useCallback(() => {
-    // Placeholder for scan functionality
-    Alert.alert('Scan', 'Document scanning coming soon.');
-  }, []);
+  // Scan = photograph a paper document with the camera and store it in the vault.
+  const handleScan = useCallback(async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera access needed', 'Allow camera access to scan documents.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+        allowsEditing: true,
+      });
+      if (result.canceled || !result.assets?.length) return;
+
+      const photo = result.assets[0];
+      if (photo.fileSize && photo.fileSize > 3 * 1024 * 1024) {
+        Alert.alert('Upload Failed', 'The scan exceeds the 3MB limit. Try again with less detail.');
+        return;
+      }
+      const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ').replace(':', '-');
+      const name = `Scan ${stamp}.jpg`;
+      await upload(photo.uri, name, photo.mimeType || 'image/jpeg');
+      Alert.alert('Uploaded', `"${name}" added to your vault.`);
+    } catch (err) {
+      Alert.alert('Scan Failed', err instanceof Error ? err.message : 'Unknown error');
+    }
+  }, [upload]);
 
   const vaultDocs = vaultData?.documents || [];
   const sharedDocs = sharedData?.documents || [];

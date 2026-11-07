@@ -26,10 +26,5 @@ Important:
 - Do NOT hallucinate details not visible.
 - If image quality is insufficient, say so clearly.
 
-Structure your response as:
-
-1. Image Type
-2. Visible Findings
-3. Abnormal Findings (if any)
-4. Extracted Text (if present)
-5. Clinical Impression (non-diagnostic)
+Work through the steps above, then write only the final reply, in the reply format
+given at the end of these instructions. Do not show the intermediate steps.

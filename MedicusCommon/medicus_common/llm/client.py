@@ -93,6 +93,8 @@ def get_model_settings(role: str, *, max_tokens: Optional[int] = None, temperatu
         kwargs["extra_args"] = extra
 
     if tools:
+        if s.force_tool_use:
+            kwargs["tool_choice"] = "required"
         if s.parallel_tool_calls is not None:
             kwargs["parallel_tool_calls"] = s.parallel_tool_calls
         elif is_openai:
@@ -210,7 +212,8 @@ async def transcribe(audio_path: Path) -> str:
     s = get_llm_settings()
     client = _audio_client(s.resolved_stt_provider, s.stt_base_url, s.stt_api_key)
     with open(audio_path, "rb") as audio_file:
-        result = await client.audio.transcriptions.create(model=s.stt_model, file=audio_file, response_format="text")
+        # Default (JSON) response format: every compatible server supports it, plain "text" is optional.
+        result = await client.audio.transcriptions.create(model=s.stt_model, file=audio_file)
     return (result if isinstance(result, str) else getattr(result, "text", "")).strip()
 
 

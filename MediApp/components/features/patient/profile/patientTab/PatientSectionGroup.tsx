@@ -12,26 +12,28 @@ interface PatientSectionGroupProps {
   className?: string;
 }
 
+const NOT_IMPLEMENTED = new Set([
+  'patient_status',
+  'appointment_reminders',
+  'emergency_access',
+  'insurance',
+]);
+
 export const PatientSectionGroup: React.FC<PatientSectionGroupProps> = ({
   sections,
   sectionKeys,
   isViewingAsDoctor = false,
   className = 'mt-3 mx-4',
 }) => {
+  // Sections without a working screen yet are hidden (listed in ROADMAP.md for contributors).
   const filteredSections = sectionKeys
     .map(key => sections.find(s => s.key === key))
-    .filter((s): s is PatientSection => !!s);
+    .filter((s): s is PatientSection => !!s && !NOT_IMPLEMENTED.has(s.key));
 
   return (
     <ProfileCard className={className}>
       {filteredSections.map((section, index, arr) => {
         const isLast = index === arr.length - 1;
-        const isDisabled =
-          section.key === 'patient_status' ||
-          section.key === 'appointment_reminders' ||
-          section.key === 'emergency_access' ||
-          section.key === 'insurance';
-
         return (
           <ProfileRow
             key={section.key}
@@ -40,11 +42,7 @@ export const PatientSectionGroup: React.FC<PatientSectionGroupProps> = ({
             href={section.route}
             icon={section.icon}
             isLast={isLast}
-            badge={
-              !isViewingAsDoctor && !isDisabled ? section.badge : undefined
-            }
-            disabled={isDisabled}
-            showComingSoon={isDisabled}
+            badge={!isViewingAsDoctor ? section.badge : undefined}
           />
         );
       })}

@@ -461,7 +461,8 @@ const ChatScreen: React.FC = () => {
 
           <MessageInput
             onSend={handleSendText}
-            onRealTimePress={handleRealTimePress}
+            // Live voice calls use the OpenAI Realtime API; hidden unless the server enables it
+            onRealTimePress={process.env.EXPO_PUBLIC_REALTIME_ENABLED === 'true' ? handleRealTimePress : undefined}
             showRTCButton={isDoctor}
           />
         </View>

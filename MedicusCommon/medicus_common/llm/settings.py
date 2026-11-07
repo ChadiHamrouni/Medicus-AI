@@ -63,6 +63,10 @@ class LLMSettings(BaseSettings):
     # "none" turns off thinking on local models (Qwen3, DeepSeek-R1, gpt-oss via Ollama/vLLM).
     reasoning_effort: Optional[Literal["none", "minimal", "low", "medium", "high"]] = Field(None, alias="LLM_REASONING_EFFORT")
     parallel_tool_calls: Optional[bool] = Field(None, alias="LLM_PARALLEL_TOOL_CALLS")
+    # Make the assistant's first step a tool call (tool_choice="required"); it reverts to
+    # "auto" after the first call. Recommended for small local models, which otherwise
+    # answer record questions from memory and invent data.
+    force_tool_use: bool = Field(False, alias="LLM_FORCE_TOOL_USE")
     supports_vision: bool = Field(True, alias="LLM_SUPPORTS_VISION")
     guardrail_enabled: bool = Field(True, alias="LLM_GUARDRAIL_ENABLED")
 

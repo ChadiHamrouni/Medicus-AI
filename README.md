@@ -185,7 +185,7 @@ AI_COMMON_EXTRAS=ai,litellm      # build-time: installs LiteLLM into the AI serv
 | `LLM_MODEL_SUMMARY` / `LLM_MODEL_TEXT` | MediBrief, MediExplain, conversation compaction |
 | `LLM_MODEL_VISION` / `LLM_MODEL_DOC` / `LLM_MODEL_LAB` / `LLM_MODEL_TRIAGE` | Attachment analysis |
 
-A role without its own variable falls back to `LLM_MODEL`. **Speech** (voice notes) and **text-to-speech** take any server that implements `/v1/audio/transcriptions` or `/v1/audio/speech`, such as faster-whisper or Kokoro; see `STT_*` and `TTS_*` in [`.env.example`](.env.example).
+A role without its own variable falls back to `LLM_MODEL`. **Speech** (voice notes) and **text-to-speech** take any server that implements `/v1/audio/transcriptions` or `/v1/audio/speech`, such as faster-whisper or Kokoro, or Ollama itself with an audio model (`STT_BASE_URL=http://host.docker.internal:11434/v1`, `STT_MODEL=lfm3-audio`); see `STT_*` and `TTS_*` in [`.env.example`](.env.example). Recordings are converted to 16 kHz mono WAV before transcription. The optional live voice call (`REALTIME_ENABLED`) is the one feature that still requires the OpenAI Realtime API; it is off by default and its button is hidden in the app.
 
 ## Running the mobile app
 
@@ -325,10 +325,13 @@ Found a vulnerability? **Please do not open a public issue.** Follow [SECURITY.m
 ## Roadmap
 
 - [ ] Leaner tool definitions and per-turn tool selection, for faster small local models
+- [ ] Phone sign-up with SMS verification, social sign-in and two-factor authentication
 - [ ] Web dashboard for doctors
 - [ ] FHIR import and export
 - [ ] Helm chart for Kubernetes
 - [ ] More languages in the assistants and the app
+
+The app hides features until they work end to end. [ROADMAP.md](ROADMAP.md) lists every unfinished feature with the code where it starts: a good place to pick a first contribution.
 
 Have an idea? [Open a discussion](../../discussions) or upvote an existing issue.
 

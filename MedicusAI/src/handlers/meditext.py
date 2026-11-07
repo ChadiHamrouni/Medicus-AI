@@ -194,7 +194,8 @@ async def meditext_handler(payload: AppPayload) -> Tuple[CloudPayload, float]:
         p_name, d_name = _names(patient_context, doctor_context)
         ai_text = scrub_identifiers(result.final_output, patient_name=p_name, doctor_name=d_name)
         await _ensure_emergency_escalated(agent, agent_context, result, ai_text)
-
+        result, ai_text = await _verify_claimed_actions(
+            agent, agent_context, enriched_history, text_input, result, ai_text, p_name, d_name)
         # ----------------------------------------------------------
         # 6. Persist AI message
         # ----------------------------------------------------------
@@ -311,3 +312,67 @@ async def _ensure_emergency_escalated(agent, context, result, reply: str) -> Non
         logger.warning("[TRIAGE] Level 3 reply without an emergency tool call: escalated automatically")
     except Exception:
         logger.exception("[TRIAGE] automatic emergency escalation failed")
+
+
+# "has been cancelled", "I've created", "successfully booked", "is now marked as completed"...
+_ACTION_CLAIM = re.compile(
+    r"\b(?:has|have|had)\s+been\b[^.?!\n]{0,40}?\b(?:created|cancell?ed|deleted|booked|scheduled|recorded|added|"
+    r"updated|marked|closed|opened|prescribed|ordered|saved|documented|finalized|invalidated|rescheduled|removed|"
+    r"activated|triggered)\b"
+    r"|\bI(?:'ve| have)\s+(?:now\s+|successfully\s+|just\s+)?(?:created|cancell?ed|deleted|booked|scheduled|recorded|"
+    r"added|updated|marked|closed|opened|prescribed|ordered|saved|documented|finalized|invalidated|rescheduled|removed)\b"
+    r"|\bsuccessfully\s+(?:created|cancell?ed|deleted|booked|scheduled|recorded|added|updated|closed|opened|"
+    r"prescribed|ordered|saved|documented|finalized|invalidated|rescheduled|removed)\b",
+    re.IGNORECASE,
+)
+# The user's message must ask for a change; otherwise "has been scheduled" just describes data.
+_ACTION_REQUEST = re.compile(
+    r"\b(?:book|cancel|record|add|prescribe|create|open|close|schedule|reschedule|delete|remove|mark|write|"
+    r"update|order|trigger|correct|invalidate|log|note|finali[sz]e|report)\b", re.IGNORECASE)
+_READ_ONLY_PREFIXES = ("get_", "show_", "find_", "search_")
+_READ_ONLY_TOOLS = {"medibrief_summarize", "mediexplain_explain"}
+
+_VERIFY_NOTE = (
+    "System check: your previous reply said an action was completed, but no tool was called, "
+    "so nothing was saved. Call the correct tool now to actually perform the action the user asked for. "
+    "If you cannot, tell the user plainly that it was not done. Do not claim success without a tool call."
+)
+_NOT_DONE = ("I wasn't able to complete that action, so nothing was changed. "
+             "Please try again, or rephrase what you'd like me to do.")
+
+
+def _called_tools(result) -> list[str]:
+    return [getattr(getattr(i, "raw_item", None), "name", None)
+            for i in (getattr(result, "new_items", None) or [])
+            if getattr(getattr(i, "raw_item", None), "name", None)]
+
+
+def _is_write(name: str) -> bool:
+    return not name.startswith(_READ_ONLY_PREFIXES) and name not in _READ_ONLY_TOOLS
+
+
+async def _verify_claimed_actions(agent, context, history, text_input, result, reply, p_name, d_name):
+    """Never let the assistant claim an action it did not perform.
+
+    Small models sometimes answer "the prescription has been cancelled" without calling
+    any tool. If a reply claims an action and no write tool ran this turn, retry once with
+    an explicit correction; if the retry still performs nothing, say so honestly.
+    """
+    if (not _ACTION_REQUEST.search(text_input or "") or not _ACTION_CLAIM.search(reply or "")
+            or any(_is_write(n) for n in _called_tools(result))):
+        return result, reply
+    if not any(_is_write(getattr(t, "name", "")) for t in agent.tools):
+        return result, reply
+
+    logger.warning("[VERIFY] reply claimed an action without a write tool call: retrying once")
+    retry_agent = agent.clone(input_guardrails=[])  # the correction is ours, not user input
+    retry = await run_text(
+        text_input=_VERIFY_NOTE,
+        agent=retry_agent,
+        history=history + [{"role": "user", "content": text_input}, {"role": "assistant", "content": reply}],
+        context=context,
+    )
+    if retry and not isinstance(retry, str) and any(_is_write(n) for n in _called_tools(retry)):
+        return retry, scrub_identifiers(retry.final_output, patient_name=p_name, doctor_name=d_name)
+    logger.warning("[VERIFY] retry performed no action: replying that nothing was done")
+    return result, _NOT_DONE

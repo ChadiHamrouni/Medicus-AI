@@ -28,10 +28,5 @@ Important:
 - Do NOT infer missing values.
 - If parts are unreadable, state that explicitly.
 
-Structure your response as:
-
-1. Extracted Text
-2. Structured Lab Data (table format if possible)
-3. Abnormal Findings
-4. Key Clinical Notes
-5. Overall Summary (non-diagnostic)
+Work through the steps above, then write only the final reply, in the reply format
+given at the end of these instructions. Do not show the intermediate steps.

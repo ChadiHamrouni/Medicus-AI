@@ -236,25 +236,6 @@ const CleanSignInForm: React.FC = () => {
           </TouchableOpacity>
         </Text>
       </View>
-
-      {/* Coming Soon: SSO Options */}
-      <View className="mt-8 items-center">
-        <Text className="text-gray-400 text-xs mb-3">Coming Soon</Text>
-        <View className="flex-row space-x-4">
-          <TouchableOpacity
-            className="p-3 bg-gray-100 rounded-lg opacity-50"
-            disabled
-          >
-            <Text className="text-2xl">🔗</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="p-3 bg-gray-100 rounded-lg opacity-50"
-            disabled
-          >
-            <Text className="text-2xl">📧</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
     </View>
   );
 };

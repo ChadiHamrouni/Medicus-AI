@@ -31,15 +31,16 @@ async def transcribe_audio(storage_key: str) -> str:
         audio_path = Path(raw_path)
         paths.append(audio_path)
 
-        # Mono 16 kHz WAV is the most portable input for Whisper-style servers.
+        # Mono 16 kHz WAV is the one input every STT server accepts (Whisper servers decode
+        # anything via ffmpeg; Ollama audio models such as LFM3 expect 16 kHz WAV). Always
+        # convert, so quiet recordings are not sent as raw .m4a.
         if AudioSegment is not None:
             try:
                 audio = AudioSegment.from_file(str(audio_path))
-                if audio.dBFS > -50:
-                    wav_path = audio_path.with_suffix(".processed.wav")
-                    audio.set_channels(1).set_frame_rate(16000).export(wav_path, format="wav")
-                    paths.append(wav_path)
-                    audio_path = wav_path
+                wav_path = audio_path.with_suffix(".processed.wav")
+                audio.set_channels(1).set_frame_rate(16000).set_sample_width(2).export(wav_path, format="wav")
+                paths.append(wav_path)
+                audio_path = wav_path
             except Exception as e:
                 logger.warning(f"[MEDIVOX] Audio normalisation skipped: {e}")
 

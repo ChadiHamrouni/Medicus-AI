@@ -1,201 +1,218 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { Text, TouchableOpacity, View, ScrollView, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-// Remote, topic-aligned, tested Unsplash image URLs (each includes sizing & compression params for performance)
-// NOTE: If an image ever fails it will auto-fallback via failedImages state below.
-const TOPIC_IMAGE_URLS = {
-  // Clinical / condition topics
-  alzheimers:
-    'https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?auto=format&fit=crop&w=800&q=70', // neuron / brain pathology
-  aiDiagnostics:
-    'https://images.unsplash.com/photo-1581091012184-5c1d3e7f1c54?auto=format&fit=crop&w=800&q=70', // stylized DNA / data (AI diagnostics context)
-  geneEditing:
-    'https://images.unsplash.com/photo-1581092334651-ddf49a1c89f2?auto=format&fit=crop&w=800&q=70', // CRISPR / pipette lab scene
-  pointOfCareUltrasound:
-    'https://images.unsplash.com/photo-1627662169656-a7e9d6c6714d?auto=format&fit=crop&w=800&q=70', // handheld ultrasound usage
-  clinicalDecisionTool:
-    'https://images.unsplash.com/photo-1606761568499-6d2451b23c66?auto=format&fit=crop&w=800&q=70', // clinician reviewing decision support
-  // Patient lifestyle / wellness
-  walking:
-    'https://images.unsplash.com/photo-1524594081293-190a2fe0baae?auto=format&fit=crop&w=800&q=70', // brisk outdoor walk
-  diabetes:
-    'https://images.unsplash.com/photo-1603398938378-e54eab446dde?auto=format&fit=crop&w=800&q=70', // glucometer reading
-  stretching:
-    'https://images.unsplash.com/photo-1584467735871-bd1ceee76b95?auto=format&fit=crop&w=800&q=70', // morning stretch
-  bloodPressure:
-    'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?auto=format&fit=crop&w=800&q=70', // blood pressure monitor
-  vitaminD:
-    'https://images.unsplash.com/photo-1608474928833-3a00d097d9a1?auto=format&fit=crop&w=800&q=70', // supplement capsules
+import { useAuthContext } from '@/contexts/AuthContext';
+import { UserRole } from '@/types/auth';
+
+// Bundled photos (Unsplash License, see assets/images/feed/CREDITS.md): the feed renders
+// offline and on first launch without depending on remote image hosts.
+const IMAGES = {
+  walking: require('@/assets/images/feed/walking.jpg'),
+  bloodSugar: require('@/assets/images/feed/blood-sugar.jpg'),
+  bpMonitor: require('@/assets/images/feed/bp-monitor.jpg'),
+  vitaminD: require('@/assets/images/feed/vitamin-d.jpg'),
+  stretching: require('@/assets/images/feed/stretching.jpg'),
+  heartHealth: require('@/assets/images/feed/heart-health.jpg'),
+  neurology: require('@/assets/images/feed/neurology.jpg'),
+  aiImaging: require('@/assets/images/feed/ai-imaging.jpg'),
+  genomics: require('@/assets/images/feed/genomics.jpg'),
+  hypertension: require('@/assets/images/feed/hypertension.jpg'),
+  clinicalTools: require('@/assets/images/feed/clinical-tools.jpg'),
 };
 
-// Mock data for different content types
-const MOCK_CONTENT = {
+const FEED_CONTENT = {
   patient: {
     news: [
       {
-        id: '1',
+        id: 'p1',
         type: 'news',
-        title: 'New Study Shows Benefits of Walking 10,000 Steps Daily',
+        title: 'A Daily Walk Does More for Your Heart Than You Think',
         description:
-          'Recent research confirms that walking 10,000 steps per day significantly improves cardiovascular health and mental wellbeing.',
-        image: TOPIC_IMAGE_URLS.walking,
-        imageAlt:
-          'People taking a brisk outdoor walk representing daily step activity',
+          'Even 30 minutes of brisk walking most days lowers blood pressure, improves cholesterol and lifts your mood. Here is how to build the habit.',
+        image: IMAGES.walking,
+        imageAlt: 'A group of people walking along a sunny park path',
         readTime: '3 min read',
         category: 'Wellness',
         timestamp: '2h ago',
       },
       {
-        id: '2',
+        id: 'p2',
         type: 'news',
-        title:
-          'Managing Diabetes: New Guidelines for Better Blood Sugar Control',
+        title: 'Checking Your Blood Sugar at Home: A Practical Guide',
         description:
-          'Updated recommendations for diabetes management focusing on lifestyle changes and medication adherence.',
-        image: TOPIC_IMAGE_URLS.diabetes,
-        imageAlt: 'Close-up of a glucometer displaying a blood glucose reading',
+          'When to test, how to read the numbers, and which patterns are worth sharing with your doctor at your next visit.',
+        image: IMAGES.bloodSugar,
+        imageAlt: 'A person checking their blood sugar with a glucose meter',
         readTime: '5 min read',
-        category: 'Condition Management',
-        timestamp: '4h ago',
+        category: 'Diabetes Care',
+        timestamp: '5h ago',
+      },
+      {
+        id: 'p3',
+        type: 'news',
+        title: 'Five Everyday Habits for a Healthier Heart',
+        description:
+          'Less salt, more sleep, regular movement, not smoking and knowing your numbers: small changes that add up over the years.',
+        image: IMAGES.heartHealth,
+        imageAlt: 'A stethoscope with a red heart',
+        readTime: '4 min read',
+        category: 'Heart Health',
+        timestamp: '1d ago',
       },
     ],
     advice: [
       {
-        id: '3',
+        id: 'p4',
         type: 'advice',
-        title: 'Your Personalized Heart Health Tips',
+        title: 'Your Heart Health Checklist',
         description:
-          'Based on your profile, here are specific recommendations for maintaining optimal cardiovascular health.',
+          'Simple steps that make the biggest difference for blood pressure and long-term heart health.',
         icon: 'heart-pulse',
         category: 'Heart Health',
         tips: [
-          'Take medications as prescribed',
-          'Monitor blood pressure daily',
-          'Reduce sodium intake',
+          'Take your medication at the same time every day',
+          'Check your blood pressure twice a week and note the readings',
+          'Aim for less than 2,000 mg of sodium a day',
+        ],
+      },
+      {
+        id: 'p5',
+        type: 'advice',
+        title: 'Sleep Better Tonight',
+        description:
+          'Adults need 7 to 9 hours. A consistent routine is the easiest place to start.',
+        icon: 'sleep',
+        category: 'Sleep',
+        tips: [
+          'Go to bed and wake up at the same time, even on weekends',
+          'Keep screens out of the bedroom for the last hour',
         ],
       },
     ],
     products: [
       {
-        id: '4',
+        id: 'p6',
         type: 'product',
-        title: 'OMRON Blood Pressure Monitor',
+        title: 'Upper-Arm Blood Pressure Monitor',
         description:
-          'Clinically validated home blood pressure monitor with smartphone connectivity.',
-        image: TOPIC_IMAGE_URLS.bloodPressure,
-        price: '$79.99',
-        rating: 4.8,
+          'Clinically validated automatic monitor with a wide-range cuff and memory for two users.',
+        image: IMAGES.bpMonitor,
+        price: '$49.99',
+        rating: 4.7,
         category: 'Health Devices',
       },
       {
-        id: '5',
+        id: 'p7',
         type: 'product',
-        title: 'Nature Made Vitamin D3',
+        title: 'Vitamin D3 1000 IU Softgels',
         description:
-          'High-quality vitamin D3 supplement to support bone and immune health.',
-        image: TOPIC_IMAGE_URLS.vitaminD,
-        price: '$12.99',
+          'A daily supplement to support bone and immune health. Ask your doctor whether you need it.',
+        image: IMAGES.vitaminD,
+        price: '$11.49',
         rating: 4.6,
         category: 'Supplements',
       },
     ],
     videos: [
       {
-        id: '6',
+        id: 'p8',
         type: 'video',
-        title: '10-Minute Morning Stretches for Back Pain',
+        title: '10-Minute Morning Stretches for Lower Back Pain',
         description:
-          'Gentle stretching routine designed to alleviate lower back pain and improve flexibility.',
-        thumbnail: TOPIC_IMAGE_URLS.stretching,
+          'A gentle routine a physiotherapist recommends for stiffness after long days at a desk.',
+        thumbnail: IMAGES.stretching,
         duration: '10:24',
         category: 'Exercise',
-        views: '125K views',
+        views: '126K views',
       },
     ],
   },
   doctor: {
     news: [
       {
-        id: '7',
+        id: 'd1',
         type: 'news',
-        title: "FDA Approves New Alzheimer's Drug with Promising Results",
+        title: "Early Alzheimer's Care: What Recent Trials Mean for Primary Care",
         description:
-          "Latest clinical trial data shows significant cognitive improvement in early-stage Alzheimer's patients.",
-        image: TOPIC_IMAGE_URLS.alzheimers,
-        imageAlt:
-          "Microscopic neuron imagery illustrating neurodegeneration relevant to Alzheimer's disease",
-        readTime: '4 min read',
-        category: 'Pharmaceuticals',
+          'A review of the latest disease-modifying therapy data, eligibility criteria, and the role of MRI monitoring.',
+        image: IMAGES.neurology,
+        imageAlt: 'Two clinicians reviewing a brain MRI together',
+        readTime: '6 min read',
+        category: 'Neurology',
         timestamp: '1h ago',
       },
       {
-        id: '8',
+        id: 'd2',
         type: 'news',
-        title:
-          'AI-Powered Diagnostic Tools Show 95% Accuracy in Cancer Detection',
+        title: 'AI-Assisted Imaging: Where It Helps and Where It Does Not',
         description:
-          'Machine learning algorithms demonstrate superior performance in early cancer screening compared to traditional methods.',
-        image:
-          'https://images.unsplash.com/photo-1666887360790-3e6825a6c0f4?auto=format&fit=crop&w=800&q=70',
-        imageAlt:
-          'Abstract medical AI interface illustrating diagnostic algorithm accuracy',
-        readTime: '6 min read',
+          'Decision-support models now flag findings on X-rays and CT scans. Here is how to read their output critically.',
+        image: IMAGES.aiImaging,
+        imageAlt: 'A clinician pointing at an X-ray on a tablet',
+        readTime: '5 min read',
         category: 'Technology',
         timestamp: '3h ago',
       },
-      // Extra mock entries for richer screenshot section (can remove later)
       {
-        id: '8a',
+        id: 'd3',
         type: 'news',
-        title: 'Breakthrough in Gene Editing Safety Profile',
+        title: 'Home Blood Pressure Monitoring in Hypertension Management',
         description:
-          'New off-target reduction technique increases precision and may accelerate clinical adoption.',
-        image: TOPIC_IMAGE_URLS.geneEditing,
-        imageAlt:
-          'Researcher using pipette in genetics lab depicting gene editing work',
-        readTime: '5 min read',
-        category: 'Genomics',
-        timestamp: '5h ago',
+          'Out-of-office readings improve diagnosis and adherence. A practical protocol you can share with patients.',
+        image: IMAGES.hypertension,
+        imageAlt: "A clinician measuring a patient's blood pressure",
+        readTime: '4 min read',
+        category: 'Cardiology',
+        timestamp: '6h ago',
       },
       {
-        id: '8b',
+        id: 'd4',
         type: 'news',
-        title: 'Point-of-Care Ultrasound Usage Up 40% in Outpatient Clinics',
+        title: 'Pharmacogenomic Testing Moves Into Routine Practice',
         description:
-          'Portable imaging adoption rising for rapid differential refinement and patient reassurance.',
-        image: TOPIC_IMAGE_URLS.pointOfCareUltrasound,
-        imageAlt:
-          'Clinician performing handheld ultrasound examination at point of care',
-        readTime: '3 min read',
-        category: 'Practice Trends',
-        timestamp: '6h ago',
+          'Which gene-drug pairs have the strongest evidence, and when testing can change your prescribing.',
+        image: IMAGES.genomics,
+        imageAlt: 'A researcher using a micropipette in a laboratory',
+        readTime: '5 min read',
+        category: 'Genomics',
+        timestamp: '1d ago',
       },
     ],
     education: [
       {
-        id: '9',
+        id: 'd5',
         type: 'education',
-        title: 'CME: Advanced Cardiac Imaging Techniques',
+        title: 'CME: Interpreting Echocardiograms in Primary Care',
         description:
-          'Earn 4 CME credits learning about the latest cardiac imaging modalities and interpretation methods.',
+          'Recognise the key findings in an echo report and know when to refer. Self-paced, with case studies.',
         icon: 'school',
         category: 'Cardiology CME',
         credits: 4,
-        deadline: 'Dec 15, 2024',
+        deadline: 'Jan 31, 2027',
+      },
+      {
+        id: 'd6',
+        type: 'education',
+        title: 'CME: Type 2 Diabetes, From Metformin to GLP-1',
+        description:
+          'An update on stepwise therapy, cardiovascular and renal benefits, and shared decision-making.',
+        icon: 'school',
+        category: 'Endocrinology CME',
+        credits: 3,
+        deadline: 'Mar 15, 2027',
       },
     ],
     tools: [
       {
-        id: '10',
+        id: 'd7',
         type: 'product',
-        title: 'Clinical Decision Support System',
+        title: 'Clinical Decision Support Workspace',
         description:
-          'AI-powered clinical decision support with evidence-based treatment recommendations.',
-        image: TOPIC_IMAGE_URLS.clinicalDecisionTool,
-        price: 'Free Trial',
-        rating: 4.9,
+          'Evidence-based recommendations, drug interaction checks and imaging review in one place.',
+        image: IMAGES.clinicalTools,
+        price: 'Free trial',
+        rating: 4.8,
         category: 'Clinical Tools',
       },
     ],
@@ -204,14 +221,9 @@ const MOCK_CONTENT = {
 
 const FeedTab: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  // Track failed remote images so we can swap to a stable placeholder
-  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
-  const FALLBACK_IMAGE_URL =
-    'https://placehold.co/800x400/FFFFFF/0F172A?text=Medical+Feed';
-
-  // For development: assume PATIENT role if no user is set
-  const isDoctor = false;
-  const userContent = isDoctor ? MOCK_CONTENT.doctor : MOCK_CONTENT.patient;
+  const { authState } = useAuthContext();
+  const isDoctor = authState.user?.role === UserRole.DOCTOR;
+  const userContent = isDoctor ? FEED_CONTENT.doctor : FEED_CONTENT.patient;
 
   const categories = isDoctor
     ? [
@@ -229,22 +241,16 @@ const FeedTab: React.FC = () => {
       ];
 
   const renderNewsCard = (item: any) => {
-    const imgUri = failedImages[item.id] ? FALLBACK_IMAGE_URL : item.image;
     return (
       <TouchableOpacity
         key={item.id}
         className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-4"
       >
         <Image
-          source={{ uri: imgUri }}
+          source={item.image}
           className="w-full h-48 rounded-t-2xl"
           resizeMode="cover"
           accessibilityLabel={item.imageAlt || item.title}
-          onError={() => {
-            if (!failedImages[item.id]) {
-              setFailedImages(prev => ({ ...prev, [item.id]: true }));
-            }
-          }}
         />
         <View className="p-4">
           <View className="flex-row items-center justify-between mb-2">
@@ -318,7 +324,7 @@ const FeedTab: React.FC = () => {
     >
       <View className="flex-row">
         <Image
-          source={{ uri: item.image }}
+          source={item.image}
           className="w-16 h-16 rounded-xl mr-4"
           resizeMode="cover"
         />
@@ -356,7 +362,7 @@ const FeedTab: React.FC = () => {
     >
       <View className="relative">
         <Image
-          source={{ uri: item.thumbnail }}
+          source={item.thumbnail}
           className="w-full h-48 rounded-t-2xl"
           resizeMode="cover"
         />
@@ -435,13 +441,16 @@ const FeedTab: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const getAllContent = () => {
-    const allItems: any[] = [];
-    Object.values(userContent).forEach(category => {
-      allItems.push(...category);
-    });
-    return allItems.sort(() => Math.random() - 0.5); // Simple shuffle for mixed content
-  };
+  // Interleave the sections (news, tip, product, ...) in a stable order.
+  const allContent = useMemo(() => {
+    const lists = Object.values(userContent).map(list => [...list] as any[]);
+    const mixed: any[] = [];
+    while (lists.some(list => list.length)) {
+      lists.forEach(list => list.length && mixed.push(list.shift()));
+    }
+    return mixed;
+  }, [userContent]);
+  const getAllContent = () => allContent;
 
   const getFilteredContent = () => {
     if (selectedCategory === 'all') {

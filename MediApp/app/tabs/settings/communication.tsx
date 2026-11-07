@@ -81,7 +81,7 @@ const CommunicationSettings: React.FC = () => {
           </Text>
         </View>
 
-        {contactMethods.map((method, index) => (
+        {contactMethods.filter(method => method.available).map((method, index) => (
           <TouchableOpacity
             key={method.value}
             className={`flex-row items-center px-4 py-4 ${!method.available ? 'opacity-50' : ''}`}

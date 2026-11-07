@@ -61,15 +61,6 @@ const HelpSettings: React.FC = () => {
     },
   ];
 
-  const quickGuides = [
-    { title: 'Getting Started with MediApp', icon: 'rocket-launch' },
-    { title: 'Managing Your Health Records', icon: 'folder-heart' },
-    { title: 'Scheduling Appointments', icon: 'calendar-clock' },
-    { title: 'Video Consultations Guide', icon: 'video' },
-    { title: 'Privacy and Security', icon: 'shield-account' },
-    { title: 'Troubleshooting Common Issues', icon: 'tools' },
-  ];
-
   return (
     <StandardScreenLayout title="Help & Support" onBack={() => router.back()}>
       <View className="bg-gray-50">
@@ -84,7 +75,7 @@ const HelpSettings: React.FC = () => {
             </Text>
           </View>
 
-          {helpItems.map((item, index) => {
+          {helpItems.filter(item => item.id !== 'live_chat').map((item, index) => {
             const isDisabled = item.id === 'live_chat';
 
             return (
@@ -136,53 +127,6 @@ const HelpSettings: React.FC = () => {
               </Pressable>
             );
           })}
-        </View>
-
-        {/* Quick Guides */}
-        <View className="bg-white mx-4 mt-4 rounded-lg border border-gray-200 shadow-sm">
-          <View className="p-4 border-b border-gray-100">
-            <Text className="text-lg font-semibold text-gray-900">
-              Quick Guides
-            </Text>
-            <Text className="text-sm text-gray-600 mt-1">
-              Step-by-step tutorials and guides
-            </Text>
-          </View>
-
-          {quickGuides.map((guide, index) => (
-            <Pressable
-              key={guide.title}
-              className="flex-row items-center px-4 py-4 opacity-50"
-              onPress={undefined}
-              disabled={true}
-            >
-              <View className="mr-4">
-                <MaterialCommunityIcons
-                  name={guide.icon as any}
-                  size={24}
-                  color="#9CA3AF"
-                />
-              </View>
-
-              <Text className="flex-1 text-base text-gray-400">
-                {guide.title}
-                <Text className="text-xs text-gray-400 font-normal">
-                  {' '}
-                  (Coming Soon)
-                </Text>
-              </Text>
-
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={20}
-                color="#D1D5DB"
-              />
-
-              {index < quickGuides.length - 1 && (
-                <View className="absolute bottom-0 left-16 right-4 h-px bg-gray-100" />
-              )}
-            </Pressable>
-          ))}
         </View>
 
         {/* System Status */}

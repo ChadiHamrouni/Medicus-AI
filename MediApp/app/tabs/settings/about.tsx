@@ -228,7 +228,7 @@ const AboutSettings: React.FC = () => {
             </Text>
           </View>
 
-          {aboutItems.map((item, index) => (
+          {aboutItems.filter(item => !item.disabled).map((item, index) => (
             <Pressable
               key={item.title}
               className={`flex-row items-center px-4 py-4 ${item.disabled ? 'opacity-50' : ''}`}

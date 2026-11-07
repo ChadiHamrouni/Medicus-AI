@@ -479,38 +479,6 @@ const NotificationSettings: React.FC = () => {
     }
   };
 
-  const handleTestNotification = async () => {
-    try {
-      const url = `http://localhost:8003/api/MedicusAI/test-notification`;
-
-      // Send request to MedicusAI to trigger the event flow
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'appointment',
-          patient_id: 235, // Default test user
-        }),
-      });
-
-      if (response.ok) {
-        Alert.alert(
-          'Success',
-          'Test event triggered! Check for a push notification shortly.'
-        );
-      } else {
-        throw new Error(`Server returned ${response.status}`);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to trigger test notification');
-      logger.error('Test notification failed', error as Error, {
-        component: 'NotificationSettings',
-      });
-    }
-  };
-
   if (loading) {
     return (
       <StandardScreenLayout title="Notifications">
@@ -679,15 +647,6 @@ const NotificationSettings: React.FC = () => {
             </View>
           </View>
 
-          {/* Test Notification Button */}
-          <View className="mt-8 mx-4 mb-8">
-            <Text
-              onPress={handleTestNotification}
-              className="text-center text-[#F05C0C] font-semibold text-base py-3 bg-white rounded-xl border border-[#F05C0C]"
-            >
-              Test New Appointment Notification
-            </Text>
-          </View>
         </>
       )}
     </StandardScreenLayout>

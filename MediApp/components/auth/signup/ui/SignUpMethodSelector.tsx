@@ -17,28 +17,14 @@ export const SignUpMethodSelector: React.FC<SignUpMethodSelectorProps> = ({
   const router = useRouter();
   const methods = [
     {
-      id: 'phone' as SignUpMethod,
-      title: 'Phone number',
-      // subtitle: 'Get a verification code via SMS',
-      icon: 'cellphone',
-      primary: true,
-    },
-    {
       id: 'email' as SignUpMethod,
       title: 'Email',
       // subtitle: 'Create account with email & password',
       icon: 'email',
-      primary: false,
-      disabled: true,
+      primary: true,
+      disabled: false,
     },
-    {
-      id: 'google' as SignUpMethod,
-      title: 'Google account',
-      // subtitle: 'Quick signup with your Google account',
-      icon: 'google',
-      primary: false,
-      disabled: true,
-    },
+    // Phone sign-up needs SMS verification, which the backend does not provide yet (see ROADMAP.md).
   ];
 
   return (

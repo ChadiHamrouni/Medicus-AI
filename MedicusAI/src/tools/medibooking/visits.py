@@ -83,22 +83,31 @@ async def get_medical_visits(
         WHERE patient_id = $1 AND doctor_id = $2
     """
 
+    # time_range comes from the model: parse it and bind it, never interpolate it.
+    since = datetime.now(UTC) - timedelta(days=3 * 365)
+    if time_range:
+        try:
+            since = datetime.fromisoformat(str(time_range).strip().replace("Z", "+00:00"))
+            if since.tzinfo is None:
+                since = since.replace(tzinfo=UTC)
+        except ValueError:
+            pass
+    params = [patient_id, doctor_id]
     if upcoming_only:
         query = f"{base_query} AND start_time > NOW()"
     else:
-        three_years = (datetime.now(UTC) - timedelta(days=3 * 365)).isoformat()
-        time_filter = f"start_time >= '{time_range if time_range else three_years}'"
+        params.append(since)
         query = f"""
             {base_query}
             AND (
                 start_time > NOW()
                 OR (start_time <= NOW() AND (end_time IS NULL OR end_time >= NOW()))
-                OR ({time_filter})
+                OR start_time >= $3
             )
         """
     try:
         async with db_manager.get_connection() as conn:
-            rows = await conn.fetch(query, patient_id, doctor_id)
+            rows = await conn.fetch(query, *params)
 
         all_entries = []
         for row in rows:

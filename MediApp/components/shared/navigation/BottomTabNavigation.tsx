@@ -231,7 +231,6 @@ export const BottomTabNavigation: React.FC<BottomTabNavigationProps> = ({
       label: 'Feed',
       route: '/tabs/feed',
       badge: badges.feed,
-      disabled: true,
     },
     getRoleSpecificTab(), // Dynamic tab based on user role
     {

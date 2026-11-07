@@ -77,12 +77,15 @@ async def get_medical_examinations(
     if not isinstance(patient_id, int):
         raise ValidationError("patient_id must be an integer.")
 
-    # 1. Handle Time Filter for Completed Exams
-    if not time_range:
-        three_years_ago = (datetime.now(timezone.utc) - timedelta(days=3 * 365)).date()
-        time_filter = f"exam_date >= '{three_years_ago}'"
-    else:
-        time_filter = f"exam_date >= '{time_range}'"
+    # 1. Time filter for completed exams. The value comes from the model, so it is parsed
+    #    and passed as a bind parameter (never interpolated into SQL). Anything that isn't
+    #    a date ("None", "last year", ...) falls back to the default window.
+    since_date = (datetime.now(timezone.utc) - timedelta(days=3 * 365)).date()
+    if time_range:
+        try:
+            since_date = datetime.fromisoformat(str(time_range).strip()[:10]).date()
+        except ValueError:
+            pass
 
     # 2. SQL Query Construction
     query_orders = """
@@ -98,7 +101,7 @@ async def get_medical_examinations(
         WHERE patient_id = $1
     """
 
-    query_completed = f"""
+    query_completed = """
         SELECT 
             id, patient_id, doctor_id, doctor_name, 
             exam_type, exam_type::text AS display_name,
@@ -108,14 +111,14 @@ async def get_medical_examinations(
             exam_summary,
             created_at, 'completed' AS status
         FROM public.medical_examinations_view
-        WHERE patient_id = $1 AND {time_filter}
+        WHERE patient_id = $1 AND exam_date >= $2
     """
 
     query = query_orders if pending_only else f"{query_orders} UNION ALL {query_completed} ORDER BY created_at DESC"
 
     try:
         async with db_manager.get_connection() as conn:
-            rows = await conn.fetch(query, patient_id)
+            rows = await (conn.fetch(query, patient_id) if pending_only else conn.fetch(query, patient_id, since_date))
 
         # 3. Data Transformation
         all_entries = []

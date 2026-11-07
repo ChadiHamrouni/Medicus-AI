@@ -38,7 +38,11 @@ async def mediscan_handler(payload: AppPayload, redis=None) -> Tuple[CloudPayloa
             if data is None:
                 parts.append(f"[Attachment {i}]\nThis file could not be found.")
                 continue
-            result = await run_attachment(data, guess_content_type(key), Path(key).suffix)
+            result = await run_attachment(
+                data, guess_content_type(key), Path(key).suffix,
+                audience="doctor" if payload.assistant == "medidoc" else "patient",
+                user_text=payload.text_io if isinstance(payload.text_io, str) else None,
+            )
             text = result.get("text") if result.get("status") == "ok" else result.get("reason")
             parts.append(text if len(keys) == 1 else f"[Attachment {i}]\n{text}")
         ai_text = "\n\n".join(parts)

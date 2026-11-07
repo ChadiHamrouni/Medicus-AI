@@ -114,9 +114,15 @@ export const CertificationsForm: React.FC<CertificationsFormProps> = ({
   useEffect(() => {
     if (profile) {
       const formData: CertificationsFormData = {
+        // The server may return null fields (e.g. a certification without a date);
+        // the form works with strings only.
         certifications:
           profile.certifications && profile.certifications.length > 0
-            ? profile.certifications
+            ? profile.certifications.map((cert: any) => ({
+              title: cert?.title ?? '',
+              issuing_body: cert?.issuing_body ?? '',
+              certif_date: cert?.certif_date ? String(cert.certif_date).slice(0, 10) : '',
+            }))
             : [{ title: '', issuing_body: '', certif_date: '' }],
       };
 
@@ -127,6 +133,8 @@ export const CertificationsForm: React.FC<CertificationsFormProps> = ({
       });
     }
   }, [profile, reset]);
+
+  const text = (value: unknown) => (value == null ? '' : String(value).trim());
 
   const addCertification = () => {
     const lastCertification = fields[fields.length - 1];
@@ -142,9 +150,9 @@ export const CertificationsForm: React.FC<CertificationsFormProps> = ({
 
     if (
       lastCertValue &&
-      (!lastCertValue.title.trim() ||
-        !lastCertValue.issuing_body.trim() ||
-        !lastCertValue.certif_date.trim())
+      (!text(lastCertValue.title) ||
+        !text(lastCertValue.issuing_body) ||
+        !text(lastCertValue.certif_date))
     ) {
       Alert.alert(
         'Incomplete Certification',
@@ -191,16 +199,16 @@ export const CertificationsForm: React.FC<CertificationsFormProps> = ({
       try {
         const validCertifications = data.certifications.filter(
           cert =>
-            cert.title.trim() &&
-            cert.issuing_body.trim() &&
-            cert.certif_date.trim()
+            text(cert.title) &&
+            text(cert.issuing_body) &&
+            text(cert.certif_date)
         );
 
         const request: ProfessionalInfoRequest = {
           certifications: validCertifications.map(cert => ({
-            title: cert.title.trim(),
-            issuing_body: cert.issuing_body.trim(),
-            certif_date: cert.certif_date.trim(),
+            title: text(cert.title),
+            issuing_body: text(cert.issuing_body),
+            certif_date: text(cert.certif_date),
           })),
         };
 
