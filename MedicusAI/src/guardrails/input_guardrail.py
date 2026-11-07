@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from agents import Agent, Runner, GuardrailFunctionOutput, RunContextWrapper
 from agents import input_guardrail as _input_guardrail_decorator
 
-from medicus_common.llm import get_agent_model
+from medicus_common.core.logging_config import logger
+from medicus_common.llm import get_agent_model, get_model_settings
 
 
 class GuardrailCheck(BaseModel):
@@ -49,6 +50,7 @@ Be precise — do NOT flag legitimate medical requests or casual conversation.
 _guardrail_agent = Agent(
     name="InputGuardrail",
     model=get_agent_model("guardrail"),
+    model_settings=get_model_settings("guardrail"),
     instructions=_GUARDRAIL_INSTRUCTIONS,
     output_type=GuardrailCheck,
 )
@@ -60,12 +62,37 @@ async def input_guardrail(
     agent: Agent,
     input: str,
 ) -> GuardrailFunctionOutput:
+    # The agent's input is the whole conversation (system context + history + new turn).
+    # Classify only the newest user message: judging the history would block every
+    # later message once a single earlier turn looked adversarial.
+    latest = _latest_user_text(input)
+    if not latest.strip():
+        return GuardrailFunctionOutput(output_info=None, tripwire_triggered=False)
     result = await Runner.run(
         starting_agent=_guardrail_agent,
-        input=input,
+        input=latest,
     )
     check: GuardrailCheck = result.final_output
+    if check.is_violation:
+        # The classifier's reason only; never the user's message (may contain patient data).
+        logger.warning(f"[GUARDRAIL] blocked input for agent {agent.name}: {check.reasoning[:200]}")
     return GuardrailFunctionOutput(
         output_info=check,
         tripwire_triggered=check.is_violation,
     )
+
+
+def _latest_user_text(input) -> str:
+    """Text of the most recent user message from a str or a list of input items."""
+    if isinstance(input, str):
+        return input
+    for item in reversed(list(input or [])):
+        role = item.get("role") if isinstance(item, dict) else getattr(item, "role", None)
+        if role != "user":
+            continue
+        content = item.get("content") if isinstance(item, dict) else getattr(item, "content", None)
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):  # multimodal parts
+            return " ".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") in ("text", "input_text"))
+    return ""

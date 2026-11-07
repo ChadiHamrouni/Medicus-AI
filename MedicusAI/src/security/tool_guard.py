@@ -267,6 +267,7 @@ def guard_tool(tool: FunctionTool) -> FunctionTool:
                 logger.warning(f"[TOOL_GUARD] {tool.name}: record {record_id} outside scope of user {ctx.get('user_id')}")
                 return _error("Record not found.")
 
+        logger.info(f"[TOOL] {tool.name} called by {ctx.get('actor_role')} (assistant={ctx.get('assistant')})")
         return _to_model_text(await original(tool_ctx, json.dumps(args, default=str)))
 
     set_function_tool_failure_error_function(tool, _tool_failure_handler(tool.name))

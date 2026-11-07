@@ -136,3 +136,4 @@ docker-compose.legacy.yml
 
 # Maestro UI-test run output
 /MediApp/tests/.maestro/screenshots/
+tests/e2e/*_report.json

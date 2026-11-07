@@ -93,7 +93,7 @@ def build_convo_context(
     if patient_context:
         p = []
         p.append("## Patient Overview")
-        p.append(f"Patient reference: #{patient_context.id}")  # NOT authoritative
+        p.append(f"Internal patient reference (for tools only; never mention to the user): {patient_context.id}")
         p.append(f"Name: {patient_context.first_name} {patient_context.last_name}")
 
         if patient_context.dob:
@@ -110,7 +110,7 @@ def build_convo_context(
     # Doctor (descriptive only)
     # -----------------------------
     if doctor_context:
-        d = ["## Clinician Overview", f"Clinician reference: #{doctor_context.id}",
+        d = ["## Clinician Overview", f"Internal clinician reference (for tools only; never mention to the user): {doctor_context.id}",
              f"Name: Dr. {doctor_context.first_name} {doctor_context.last_name}"]
 
         if doctor_context.specialty_name:
@@ -128,7 +128,7 @@ def build_convo_context(
         convo_ids.append(f"Patient mirror conversation ID: {convo_context['mirror_conversation_id']}")
 
     if convo_ids:
-        parts.append("## Conversation Context\n" + "\n".join(convo_ids))
+        parts.append("## Conversation Context (internal identifiers: never show them to the user)\n" + "\n".join(convo_ids))
 
     # -----------------------------
     # Compaction summary (AI long-term memory)

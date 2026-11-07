@@ -7,6 +7,7 @@ with an explicit Bearer token, or carry no session cookie at all, are not
 exposed to CSRF and pass through.
 """
 
+import json
 import secrets
 
 from fastapi import Request, Response
@@ -29,6 +30,14 @@ DEFAULT_EXEMPT_PATHS = frozenset({
     "/api/MedicusUser/auth/verify-email",
     "/api/MedicusUser/auth/request-password-reset",
     "/api/MedicusUser/auth/reset-password",
+})
+
+# Endpoints that accept the refresh token in the JSON body. When the body carries it,
+# the request is authenticated by an explicit credential (what native/mobile clients
+# do), not by an ambient cookie, so CSRF does not apply.
+BODY_TOKEN_PATHS = frozenset({
+    "/api/MedicusUser/auth/refresh",
+    "/api/MedicusUser/auth/logout",
 })
 
 
@@ -66,9 +75,21 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
 
+        if request.url.path in BODY_TOKEN_PATHS and await _has_body_refresh_token(request):
+            return await call_next(request)
+
         cookie = request.cookies.get(CSRF_COOKIE_NAME)
         header = request.headers.get(CSRF_HEADER_NAME)
         if not cookie or not header or not secrets.compare_digest(cookie, header):
             logger.warning(f"CSRF validation failed: {request.method} {request.url.path}")
             return JSONResponse(status_code=403, content={"detail": "CSRF token missing or invalid"})
         return await call_next(request)
+
+
+async def _has_body_refresh_token(request: Request) -> bool:
+    try:
+        body = await request.body()  # cached by Starlette and replayed to the route
+        data = json.loads(body) if body else None
+    except (ValueError, UnicodeDecodeError):
+        return False
+    return isinstance(data, dict) and isinstance(data.get("refresh_token"), str) and bool(data["refresh_token"])

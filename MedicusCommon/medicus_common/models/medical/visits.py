@@ -71,6 +71,13 @@ class MedicalVisitEntry(BaseModel):
 
     # Provenance
     doctor_name: str = Field(..., description="Doctor conducting the visit")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def when(self) -> str:
+        """Human-readable date with the weekday spelled out, so models don't compute it."""
+        end = f"-{self.end_time:%H:%M}" if self.end_time else ""
+        return f"{self.start_time:%A, %B} {self.start_time.day}, {self.start_time:%Y, %H:%M}{end} {self.start_time.tzname() or 'UTC'}"
     healthcare_provider_name: Optional[str] = Field(None, description="Healthcare provider/facility")
 
     source: Optional[Literal["system", "clinician", "imported"]] = Field(

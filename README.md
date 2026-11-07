@@ -37,6 +37,7 @@ Patients chat with an assistant that knows their health record. Doctors chart, p
 - [Security](#security)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [Main contributors](#main-contributors)
 - [License](#license)
 
 ## Why Medicus
@@ -340,6 +341,13 @@ Contributions of every size are welcome: bug reports, documentation, translation
 3. Open a pull request. Run `./scripts/e2e.sh` before you submit.
 
 Please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Main contributors
+
+- Yahia Boussaid
+- Ismail Hamdi
+- Firas HadjKacem
+- Shady Hamrouny
 
 ## License
 

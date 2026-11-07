@@ -3,9 +3,15 @@
 # ============================================================
 
 import asyncio
+import re
+import json
+import time
+
+from agents.tool_context import ToolContext
 from typing import Tuple
 
 from medicus_common.models.convo.payload import AppPayload, CloudPayload
+from medicus_common.core.database import db_manager
 from medicus_common.core.logging_config import logger
 
 from src.assistants.medidoc.medidoc_agent import medidoc
@@ -19,6 +25,7 @@ from src.services.summarizing.compaction_service import _trigger_compaction
 from src.handlers.helpers.common.agent_helper import build_convo_context, build_agent_context
 from src.handlers.helpers.meditext.run_text import run_text
 from src.services.socketio_client import socketio_broadcast_service
+from src.security.reply_filter import scrub_identifiers
 from src.handlers.helpers.common.debug import (
     debug_payload_ids,
     debug_loaded_context,
@@ -159,6 +166,11 @@ async def meditext_handler(payload: AppPayload) -> Tuple[CloudPayload, float]:
 
         text_input = payload.text_io.strip()
         turn_number = len(recent_messages) // 2 + 1
+
+        # The app stores the user's message through MedicusConvo first and passes its id.
+        # Any other client (web, scripts, integrations) gets it stored here, so the
+        # conversation history never shows answers without questions.
+        await _ensure_user_message_saved(payload, text_input)
         debug_turn_header(turn_number, text_input)
 
         result = await run_text(
@@ -171,13 +183,17 @@ async def meditext_handler(payload: AppPayload) -> Tuple[CloudPayload, float]:
         if not result:
             raise RuntimeError("Agent returned no result")
 
-        # Guardrail tripwire returns a plain string refusal message
+        # Guardrail tripwire returns a plain string refusal message. Persist and broadcast
+        # it like any reply so it survives a reload.
         if isinstance(result, str):
+            await _save_and_broadcast_reply(payload, result)
             handler_time = time.time() - handler_start
             return CloudPayload(text_io=result, status_code=200), handler_time
 
         debug_agent_result(result)
-        ai_text = result.final_output
+        p_name, d_name = _names(patient_context, doctor_context)
+        ai_text = scrub_identifiers(result.final_output, patient_name=p_name, doctor_name=d_name)
+        await _ensure_emergency_escalated(agent, agent_context, result, ai_text)
 
         # ----------------------------------------------------------
         # 6. Persist AI message
@@ -226,3 +242,72 @@ async def meditext_handler(payload: AppPayload) -> Tuple[CloudPayload, float]:
         logger.error(f"[MEDITEXT] Handler failure: {exc}", exc_info=True)
         handler_time = time.time() - handler_start
         return CloudPayload(status_code=400, message=str(exc)), handler_time
+
+
+async def _ensure_user_message_saved(payload: AppPayload, text: str) -> None:
+    if payload.message_id:
+        exists = await db_manager.fetchval(
+            "SELECT 1 FROM dialog.messages WHERE id = $1 AND conversation_id = $2::uuid AND role = 'user'",
+            payload.message_id, payload.convo_id,
+        )
+        if exists:
+            return
+    saved = await ConvoService.add_convo_message(
+        convo_id=payload.convo_id,
+        role="user",
+        content_body={"type": "app", "text_io": text, "assistant": payload.assistant, "convo_id": payload.convo_id},
+    )
+    if saved:
+        asyncio.create_task(socketio_broadcast_service.broadcast_ai_message(payload.convo_id, {
+            "conversation_id": payload.convo_id, "role": saved["role"], "content": saved["content"],
+            "id": str(saved["id"]), "created_at": saved["created_at"], "processed_by_ai": False,
+        }))
+
+
+async def _save_and_broadcast_reply(payload: AppPayload, text: str) -> None:
+    saved = await ConvoService.add_convo_message(
+        convo_id=payload.convo_id,
+        role="assistant",
+        content_body={"type": "app", "text_io": text, "assistant": payload.assistant, "convo_id": payload.convo_id},
+        processed_by_ai=True,
+    )
+    if saved:
+        asyncio.create_task(socketio_broadcast_service.broadcast_ai_message(payload.convo_id, {
+            "conversation_id": payload.convo_id, "role": saved["role"], "content": saved["content"],
+            "id": str(saved["id"]), "created_at": saved["created_at"], "processed_by_ai": True,
+        }))
+
+def _names(patient_ctx, doctor_ctx):
+    p = " ".join(x for x in (getattr(patient_ctx, 'first_name', None), getattr(patient_ctx, 'last_name', None)) if x) or None
+    d = " ".join(x for x in (getattr(doctor_ctx, 'first_name', None), getattr(doctor_ctx, 'last_name', None)) if x) or None
+    return p, d
+
+
+_LEVEL3 = re.compile(r"triage\s*level\s*[:\-]?\s*3|level\s*3\s*[\u2014\-:]\s*emergency", re.IGNORECASE)
+
+
+async def _ensure_emergency_escalated(agent, context, result, reply: str) -> None:
+    """Safety net: a reply that classifies the turn as Triage Level 3 must have escalated.
+
+    The triage skill requires calling trigger_emergency_protocol immediately at Level 3.
+    Smaller models sometimes write the classification but skip the call; in that case
+    the server makes it, through the same guarded tool (trusted identity, audit trail).
+    """
+    if not _LEVEL3.search(reply or ""):
+        return
+    if any(getattr(getattr(item, "raw_item", None), "name", None) == "trigger_emergency_protocol"
+           for item in (getattr(result, "new_items", None) or [])):
+        return
+    tool = next((t for t in agent.tools if getattr(t, "name", None) == "trigger_emergency_protocol"), None)
+    if tool is None:
+        return
+    args = json.dumps({"emergency_data": {
+        "reason": "Assistant classified the conversation as Triage Level 3 (emergency); escalated automatically.",
+        "location_detail": None,
+    }})
+    try:
+        await tool.on_invoke_tool(
+            ToolContext(context=context, tool_name=tool.name, tool_call_id="auto-escalation", tool_arguments=args), args)
+        logger.warning("[TRIAGE] Level 3 reply without an emergency tool call: escalated automatically")
+    except Exception:
+        logger.exception("[TRIAGE] automatic emergency escalation failed")

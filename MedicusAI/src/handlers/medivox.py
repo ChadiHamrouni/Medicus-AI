@@ -12,6 +12,8 @@ from src.services.summarizing.compaction_service import _trigger_compaction
 from src.handlers.helpers.medivox.transcribe_audio import transcribe_audio
 from src.handlers.helpers.meditext.run_text import run_text
 from src.handlers.helpers.common.agent_helper import build_agent_context, build_convo_context
+from src.security.reply_filter import scrub_identifiers
+from src.handlers.meditext import _names
 from src.handlers.helpers.common.debug import debug_agent_result, debug_loaded_context, debug_turn_header
 from src.handlers.helpers.medivox.persist_transcription import _save_empty_transcription_placeholder
 from src.handlers.helpers.medivox.persist_transcription import _persist_and_broadcast
@@ -125,7 +127,7 @@ async def medivox_handler(payload: AppPayload, redis=None) -> Tuple[CloudPayload
             ai_text = result
         else:
             debug_agent_result(result)
-            ai_text = result.final_output
+            ai_text = scrub_identifiers(result.final_output, *_names(pat_ctx, doc_ctx))
 
         asyncio.create_task(_persist_and_broadcast(payload, ai_text, transcription))
         asyncio.create_task(

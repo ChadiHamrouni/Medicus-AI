@@ -120,6 +120,7 @@ async def get_doctor_agenda(
                     visit_details,
                     created_at,
                     updated_at
+                    , (SELECT trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')) FROM public.patients p WHERE p.id = medical_visits_view.patient_id) AS patient_name
                 FROM public.medical_visits_view
                 WHERE doctor_id = $1
                   AND start_time >= $2
@@ -149,6 +150,7 @@ async def get_doctor_agenda(
                     status,
                     created_at,
                     updated_at
+                    , (SELECT trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')) FROM public.patients p WHERE p.id = medical_procedures_view.patient_id) AS patient_name
                 FROM public.medical_procedures_view
                 WHERE doctor_id = $1
                   AND status = 'scheduled'
@@ -166,6 +168,7 @@ async def get_doctor_agenda(
                 event_type='appointment',
                 id=row['id'],
                 patient_id=row['patient_id'],
+                patient_name=row.get('patient_name'),
                 start_time=row['start_time'].isoformat() if row['start_time'] else None,
                 end_time=row['end_time'].isoformat() if row['end_time'] else None,
                 visit_type=row.get('visit_type'),
@@ -187,6 +190,7 @@ async def get_doctor_agenda(
                 event_type='procedure',
                 id=row['id'],
                 patient_id=row['patient_id'],
+                patient_name=row.get('patient_name'),
                 procedure_name=row.get('display_name'),
                 scheduled_date=row['scheduled_date'].isoformat() if row['scheduled_date'] else None,
                 scheduled_time=row['scheduled_time'].isoformat() if row.get('scheduled_time') else None,
