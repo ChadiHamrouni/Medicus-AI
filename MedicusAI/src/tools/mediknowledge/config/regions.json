@@ -1,0 +1,20 @@
+{
+  "REGION_BUCKETS": {
+    "nam": "nam",
+    "eur": "eur",
+    "apac": "apac",
+    "gcn": "gcn",
+    "ind": "ind",
+    "mea": "mea",
+    "sam": "sam"
+  },
+  "COUNTRY_TO_REGION": {
+    "us": "nam", "us-east": "nam", "us-west": "nam", "ca": "nam", "mx": "nam",
+    "eu-west": "eur", "eu-central": "eur", "eu-north": "eur", "uk": "eur", "fr": "eur", "de": "eur",
+    "jpn": "apac", "kor": "apac", "sgp": "apac", "aus": "apac",
+    "chn": "gcn", "hkg": "gcn", "twn": "gcn",
+    "ind": "ind", "bgd": "ind", "pak": "ind",
+    "uae": "mea", "tur": "mea", "zaf": "mea", "egy": "mea", "tun": "mea",
+    "bra": "sam", "arg": "sam", "col": "sam"
+  }
+}

@@ -63,6 +63,7 @@ export interface MedicusAIResponse {
   status_code: number;
   message?: string;
   text_io?: string; // Sara's response text — echoed from CloudPayload for rolling window
+  transcript?: string; // voice turns: what the user said, for the rolling window
 }
 
 /**

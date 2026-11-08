@@ -13,6 +13,7 @@ from src.handlers.helpers.medivox.transcribe_audio import transcribe_audio
 from src.handlers.helpers.meditext.run_text import run_text
 from src.handlers.helpers.common.agent_helper import build_agent_context, build_convo_context
 from src.security.reply_filter import scrub_identifiers
+from src.tools.mediknowledge.context import knowledge_context
 from src.handlers.meditext import _names
 from src.handlers.helpers.common.debug import debug_agent_result, debug_loaded_context, debug_turn_header
 from src.handlers.helpers.medivox.persist_transcription import _save_empty_transcription_placeholder
@@ -112,6 +113,10 @@ async def medivox_handler(payload: AppPayload, redis=None) -> Tuple[CloudPayload
 
         agent_context = build_agent_context(payload, pat_ctx)
         enriched_history = [system_message] + history
+        if payload.assistant == "mediaid" and payload.doctor_id:
+            knowledge = await knowledge_context(payload.doctor_id, transcription)
+            if knowledge:
+                enriched_history.insert(1, knowledge)
 
         turn_number = len(history) // 2 + 1
         debug_turn_header(turn_number, f"[VOICE] {transcription.strip()}")
@@ -144,7 +149,7 @@ async def medivox_handler(payload: AppPayload, redis=None) -> Tuple[CloudPayload
         )
 
         handler_time = time.time() - t_start
-        return CloudPayload(text_io=ai_text, status_code=200), handler_time
+        return CloudPayload(text_io=ai_text, transcript=transcription.strip(), status_code=200), handler_time
 
     except Exception as exc:
         logger.error(f"[MEDIVOX] Handler failure: {exc}", exc_info=True)

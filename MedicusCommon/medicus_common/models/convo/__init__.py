@@ -35,13 +35,6 @@ from medicus_common.models.convo.actions import (
     ActionLink,
     ActionLinkResponse,
 )
-from medicus_common.models.convo.realtime import (
-    RealtimeTokenRequest,
-    RealtimeTokenResponse,
-    SDPRequest,
-    SDPResponse,
-    ToolCallRequest,
-)
 
 __all__ = [
     # convo_core
@@ -72,10 +65,4 @@ __all__ = [
     # actions
     "ActionLink",
     "ActionLinkResponse",
-    # realtime
-    "RealtimeTokenRequest",
-    "RealtimeTokenResponse",
-    "SDPRequest",
-    "SDPResponse",
-    "ToolCallRequest",
 ]

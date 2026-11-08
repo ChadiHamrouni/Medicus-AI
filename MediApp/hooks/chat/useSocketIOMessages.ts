@@ -161,8 +161,14 @@ export function useSocketIOMessages({
                   });
                 }
 
+                // A user-role message broadcast by the AI service is the transcript of a voice note
+                // sent in this conversation (each participant has their own copy of a conversation).
+                // Match it by role, not by sender id: the server stores the user id, the pending
+                // bubble carries the profile id, and the two differ for most accounts.
+                const isTranscription = isAiResponse && messageData.role === 'user';
+
                 // If it's a user transcription (AI response), we want to update any existing matching message
-                if (isFromUser && isAiResponse) {
+                if (isTranscription || (isFromUser && isAiResponse)) {
                   logger.info('🎤 Processing user transcription/update', {
                     component: 'useSocketIOMessages',
                     messageId: newMessage.id,
@@ -179,6 +185,7 @@ export function useSocketIOMessages({
                   // We need to inspect the cache to find the temp message ID
                   const cacheData = queryClient.getQueryData(queryKey) as any;
                   let tempMessageIdToUpdate: string | undefined;
+                  let tempSenderId: string | undefined;
 
                   if (cacheData?.pages) {
                     for (const page of cacheData.pages) {
@@ -195,13 +202,12 @@ export function useSocketIOMessages({
                         const hasAudio = msg.attachments?.some(
                           (att: any) => att.type === 'audio'
                         );
-                        return (
-                          isTemp && hasAudio && msg.senderId === currentUserId
-                        );
+                        return isTemp && hasAudio;
                       });
 
                       if (tempAudioMsg) {
                         tempMessageIdToUpdate = tempAudioMsg.id;
+                        tempSenderId = tempAudioMsg.senderId;
                         logger.info(
                           '🎤 Found temporary audio message to update',
                           {
@@ -219,6 +225,7 @@ export function useSocketIOMessages({
                     // Update the existing temporary message with the new real message data
                     updateMessage(tempMessageIdToUpdate, {
                       ...newMessage,
+                      senderId: tempSenderId ?? newMessage.senderId, // keep it on the sender's side
                       isTemporary: false,
                       isUploading: false,
                       uploadStatus: 'sent',

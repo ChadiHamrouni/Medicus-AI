@@ -7,7 +7,7 @@ interface InputBarActionsProps {
   onRealTimePress?: () => void;
   showVoiceInput?: boolean;
   hasText?: boolean;
-  showRTCButton?: boolean; // Show RTC button for doctor conversations
+  showRTCButton?: boolean; // Show the live voice conversation button
 }
 
 /**
@@ -48,15 +48,16 @@ export const InputBarActions: React.FC<InputBarActionsProps> = ({
             <Ionicons name="mic" size={26} color="white" />
           </TouchableOpacity>
 
-          {/* RTC Button - Only for doctor conversations */}
+          {/* Live voice conversation with Sara */}
           {showRTCButton && onRealTimePress && (
             <TouchableOpacity
               onPress={onRealTimePress}
               className="bg-orange-100 border border-orange-300 ml-3"
               activeOpacity={0.75}
               style={commonButtonStyle}
+              accessibilityLabel="Talk to Sara"
             >
-              <Ionicons name="radio" size={22} color="#F05C0C" />
+              <Ionicons name="call" size={22} color="#F05C0C" />
             </TouchableOpacity>
           )}
         </>

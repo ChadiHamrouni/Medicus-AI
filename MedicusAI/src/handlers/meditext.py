@@ -8,11 +8,12 @@ import json
 import time
 
 from agents.tool_context import ToolContext
-from typing import Tuple
+from typing import Optional, Tuple
 
 from medicus_common.models.convo.payload import AppPayload, CloudPayload
 from medicus_common.core.database import db_manager
 from medicus_common.core.logging_config import logger
+from medicus_common.llm import get_agent_model, get_model_settings
 
 from src.assistants.medidoc.medidoc_agent import medidoc
 from src.assistants.docsolo.docsolo_agent import docsolo
@@ -26,6 +27,8 @@ from src.handlers.helpers.common.agent_helper import build_convo_context, build_
 from src.handlers.helpers.meditext.run_text import run_text
 from src.services.socketio_client import socketio_broadcast_service
 from src.security.reply_filter import scrub_identifiers
+from src.guardrails.input_guardrail import guardrail_model_role
+from src.tools.mediknowledge.context import knowledge_context
 from src.handlers.helpers.common.debug import (
     debug_payload_ids,
     debug_loaded_context,
@@ -41,7 +44,7 @@ AGENT_MAP = {
 }
 
 
-async def meditext_handler(payload: AppPayload) -> Tuple[CloudPayload, float]:
+async def meditext_handler(payload: AppPayload, model_role: Optional[str] = None) -> Tuple[CloudPayload, float]:
     """
     Core text turn handler.
 
@@ -67,6 +70,11 @@ async def meditext_handler(payload: AppPayload) -> Tuple[CloudPayload, float]:
         if not agent_resolver:
             return CloudPayload(status_code=400, message="Invalid assistant"), 0.0
         agent = agent_resolver(payload)
+        if model_role:
+            guardrail_model_role.set(model_role)
+            # Same agent (instructions, tools, guardrails) on another model, e.g. the live-voice model.
+            agent = agent.clone(model=get_agent_model(model_role), model_settings=get_model_settings(
+                model_role, max_tokens=agent.model_settings.max_tokens, tools=True))
 
         debug_payload_ids(payload)
 
@@ -157,6 +165,11 @@ async def meditext_handler(payload: AppPayload) -> Tuple[CloudPayload, float]:
 
         agent_context = build_agent_context(payload, patient_context)
         enriched_history = [system_message] + recent_messages
+        if payload.assistant == "mediaid" and payload.doctor_id:
+            # Ground answers about the practice in the doctor's own published material.
+            knowledge = await knowledge_context(payload.doctor_id, payload.text_io or "")
+            if knowledge:
+                enriched_history.insert(1, knowledge)
 
         # ----------------------------------------------------------
         # 5. Run agent

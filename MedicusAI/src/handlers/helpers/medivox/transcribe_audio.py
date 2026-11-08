@@ -19,10 +19,14 @@ async def transcribe_audio(storage_key: str) -> str:
     data = await get_storage().get(storage_key)
     if data is None:
         raise FileNotFoundError(f"Audio not found: {storage_key}")
+    return await transcribe_bytes(data, Path(storage_key).suffix or ".m4a")
+
+
+async def transcribe_bytes(data: bytes, suffix: str = ".m4a") -> str:
+    """Transcribe raw audio (any container ffmpeg reads) with the configured STT server."""
     if len(data) > MAX_AUDIO_BYTES:
         raise ValueError("Audio file too large (max 25MB)")
 
-    suffix = Path(storage_key).suffix or ".m4a"
     paths: list[Path] = []
     try:
         fd, raw_path = tempfile.mkstemp(suffix=suffix)

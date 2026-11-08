@@ -157,7 +157,22 @@ services:
       - "127.0.0.1:11434:11434"
     restart: unless-stopped
 
+  # Search index for the MediKnowledge ingestion pipeline (opt-in: --profile elasticsearch).
+  elasticsearch:
+    profiles: ["elasticsearch"]
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"     # local development only; enable security in production
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "127.0.0.1:9200:9200"
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   storage:
   ollama-data:
+  elasticsearch-data:

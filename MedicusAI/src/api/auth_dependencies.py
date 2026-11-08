@@ -32,7 +32,12 @@ async def get_current_user(
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    return user_from_token(token)
 
+
+def user_from_token(token: str) -> User:
+    """Validate a MedicusUser access token and return its user (HTTPException 401 if invalid).
+    Shared by HTTP endpoints and the live-voice WebSocket."""
     settings = get_settings()
     try:
         payload = jwt.decode(

@@ -14,7 +14,7 @@ export default ({ config }) => {
     ...config,
     ...(env.EXPO_OWNER ? { owner: env.EXPO_OWNER } : {}),
     ...(easProjectId ? { updates: { url: `https://u.expo.dev/${easProjectId}` } } : {}),
-    plugins: [...(config.plugins || []), 'expo-video', 'expo-audio', '@config-plugins/react-native-webrtc'],
+    plugins: [...(config.plugins || []), 'expo-video', 'expo-audio'],
     extra: {
       ...config.extra,
       ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),

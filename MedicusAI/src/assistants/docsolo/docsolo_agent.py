@@ -10,6 +10,7 @@ from src.tools.medidoctor.doctor_details import get_doctor_profile_details
 from src.tools.mediinsight.doctor_analytics import get_doctor_performance_metrics
 from src.tools.medisupport.user_support import close_support, get_support, report_support
 from src.tools.meditriage.alerts import trigger_emergency_protocol
+from src.tools.mediknowledge import search_doctor_knowledge
 
 TOOLS = [
     trigger_emergency_protocol, get_support, report_support, close_support,
@@ -17,6 +18,7 @@ TOOLS = [
     search_conversations,
     get_doctor_profile_details,
     get_doctor_performance_metrics,
+    search_doctor_knowledge,
 ]
 
 docsolo = build_assistant("MediDoc", Path(__file__).resolve().parent, "docsolo_instructions.md", TOOLS)

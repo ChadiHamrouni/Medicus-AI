@@ -12,6 +12,7 @@ from src.tools.mediclinic.vitals import get_medical_vitals
 from src.tools.medidoctor.doctor_details import get_doctor_profile_details
 from src.tools.mediexam.examinations import get_medical_examinations
 from src.tools.mediexplain.summarize import mediexplain_explain
+from src.tools.mediknowledge import search_doctor_knowledge
 from src.tools.medipatient.patient_details import get_patient_profile_details
 from src.tools.medirx.medications import get_medications
 from src.tools.medishow.doctor_profile import show_doctor_page
@@ -22,7 +23,7 @@ TOOLS = [
     trigger_emergency_protocol, get_support, report_support, close_support,
     get_medical_visits, find_free_slots, create_booking, update_booking, delete_booking,
     get_medical_vitals, get_medical_conditions, get_medical_examinations, get_medical_procedures,
-    get_doctor_profile_details,
+    get_doctor_profile_details, search_doctor_knowledge,
     mediexplain_explain,
     get_patient_profile_details,
     get_medications,

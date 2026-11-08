@@ -56,6 +56,7 @@ Most AI health assistants are closed products that send your data to a single ve
 - Find a doctor's free slots and book, reschedule or cancel appointments in conversation.
 - Message your doctor directly, with real-time delivery over Socket.IO.
 - Send voice notes (speech-to-text) and attachments such as lab reports and PDFs, which the assistant reads and explains.
+- **Talk to Sara live:** a hands-free voice conversation with the same assistant, tools and records as the chat. Both sides are saved in the conversation.
 - **MediExplain:** a plain-language summary of what your doctor discussed.
 - A personal document vault, with documents you can share with your doctor in a conversation.
 - Manage dependents (children, parents) under one account.
@@ -67,6 +68,7 @@ Most AI health assistants are closed products that send your data to a single ve
 - **MediBrief:** an on-demand clinical summary of a patient thread.
 - An agenda across all patients, conversation search, and practice performance metrics.
 - A public profile: specialties, working hours, locations, procedures and pricing.
+- **MediKnowledge:** publish your own material (procedure explanations, preparation guides, fees, insurance, clinic policies) as PDF, TXT or Markdown. Your patients' assistant answers their questions from it and names the document, instead of from general knowledge.
 
 ### Platform
 - **Model-agnostic AI layer:** OpenAI, any OpenAI-compatible server (Ollama, vLLM, LM Studio, llama.cpp, OpenRouter, Groq, Together, Azure OpenAI) or 100+ providers through LiteLLM (Anthropic, Gemini, Bedrock, Mistral and more), with a different model per task if you want.
@@ -184,12 +186,28 @@ AI_COMMON_EXTRAS=ai,litellm      # build-time: installs LiteLLM into the AI serv
 | `LLM_MODEL_GUARDRAIL` | Prompt-injection screening |
 | `LLM_MODEL_SUMMARY` / `LLM_MODEL_TEXT` | MediBrief, MediExplain, conversation compaction |
 | `LLM_MODEL_VISION` / `LLM_MODEL_DOC` / `LLM_MODEL_LAB` / `LLM_MODEL_TRIAGE` | Attachment analysis |
+| `EMBEDDING_MODEL` | Optional embeddings for MediKnowledge search (any `/v1/embeddings` server, e.g. Ollama `nomic-embed-text`). Without it, search uses PostgreSQL full-text only. |
+| `LLM_MODEL_VOICE` | The assistant during live voice conversations (and its guardrail). Use a model that fits on the GPU next to the speech model. **Must support tool calling.** |
 
-A role without its own variable falls back to `LLM_MODEL`. **Speech** (voice notes) and **text-to-speech** take any server that implements `/v1/audio/transcriptions` or `/v1/audio/speech`, such as faster-whisper or Kokoro, or Ollama itself with an audio model (`STT_BASE_URL=http://host.docker.internal:11434/v1`, `STT_MODEL=lfm3-audio`); see `STT_*` and `TTS_*` in [`.env.example`](.env.example). Recordings are converted to 16 kHz mono WAV before transcription. The optional live voice call (`REALTIME_ENABLED`) is the one feature that still requires the OpenAI Realtime API; it is off by default and its button is hidden in the app.
+A role without its own variable falls back to `LLM_MODEL`.
+
+**Speech.** Voice notes (speech-to-text) and live voice conversations (speech-to-text and text-to-speech) work with any server that implements `/v1/audio/transcriptions` and `/v1/audio/speech`: faster-whisper, Kokoro, LocalAI, or Ollama itself with an audio model. One Ollama model can do both directions:
+
+```env
+STT_BASE_URL=http://host.docker.internal:11434/v1
+STT_MODEL=lfm3-omni
+TTS_BASE_URL=http://host.docker.internal:11434/v1
+TTS_MODEL=lfm3-omni
+TTS_VOICE=female-american-english
+```
+
+Recordings are converted to 16 kHz mono WAV before transcription. A live voice turn is speech-to-text, then the conversation's assistant (same tools, guardrail and records as typed chat), then text-to-speech streamed back sentence by sentence, over a WebSocket (`/api/MedicusAI/live/voice`). No feature depends on a hosted vendor.
+
+> **Live voice on one consumer GPU:** for answers within a few seconds, the speech model and the voice assistant model must both stay loaded. With Ollama, set `OLLAMA_MAX_LOADED_MODELS=2` and pick an `LLM_MODEL_VOICE` small enough to fit next to the speech model (for example `qwen3.5:4b` with `lfm3-omni` on 8 GB). If `LLM_MODEL_VOICE` is the speech model itself, keep `OLLAMA_MAX_LOADED_MODELS=1` so the main chat model gets the whole GPU. Very small models answer fast but may skip tool calls.
 
 ## Running the mobile app
 
-The app is built with [Expo](https://expo.dev/) (React Native). It uses native modules (WebRTC, audio), so it needs a **development build**; Expo Go is not enough.
+The app is built with [Expo](https://expo.dev/) (React Native). It uses native modules (audio recording and playback), so it needs a **development build**; Expo Go is not enough.
 
 ```bash
 cd MediApp
@@ -324,14 +342,61 @@ Found a vulnerability? **Please do not open a public issue.** Follow [SECURITY.m
 
 ## Roadmap
 
-- [ ] Leaner tool definitions and per-turn tool selection, for faster small local models
-- [ ] Phone sign-up with SMS verification, social sign-in and two-factor authentication
+The app hides features until they work end to end: nothing shows a greyed-out "Coming Soon" placeholder. Everything still open is listed here, with the code where it starts, so it is easy to pick a first contribution. Open an issue before you start so others know.
+
+### Assistant quality (found in end-to-end testing with local models)
+
+- [ ] **Grounding check.** When a question is about the user's record and the model answered without calling a tool, retry or say the data could not be retrieved, instead of answering from memory. Small models sometimes skip the tool and invent an answer, and Ollama ignores `tool_choice=required` (`LLM_FORCE_TOOL_USE`). Start in `MedicusAI/src/handlers/meditext.py` (`_verify_claimed_actions` does the same for write actions).
+- [ ] **Emergency safety net on the user's message.** Detect red-flag symptoms (chest pain spreading to the arm, stroke signs…) in the user's text and call `trigger_emergency_protocol` even when the model only says "call 911". Today the backstop only reacts to "Triage Level 3" in the reply (`_ensure_emergency_escalated`).
+- [ ] **Per-turn tool selection.** Up to 35 tools are sent on every turn; route each turn to the relevant tool group to cut prompt size and wrong calls on small models.
+- [ ] **Simpler `report_medical_note` schema.** Its nested SOAP arguments often fail validation with small models.
+- [ ] **Readable `find_free_slots` output and weekday labels** on agenda, visits and procedures, so models stop misreading availability or getting the day of the week wrong.
+- [ ] **Guardrail false positives.** "What personal details do you have on file for me?" was blocked once; the classifier prompt needs examples of legitimate own-record questions (`MedicusAI/src/guardrails/input_guardrail.py`).
+- [ ] **Speech recognition of names.** Uncommon surnames (e.g. "Haddad") are sometimes misheard. Pass the user's doctors, medications and conditions to the speech model as a hint.
+- [ ] **Hands-free barge-in during live voice.** Interrupting Sara while she speaks needs echo cancellation; today you tap the interrupt button (`MediApp/app/voice-call.tsx`).
+
+### Accounts and sign-in
+
+- [ ] **Phone sign-up with SMS verification.** The UI exists but is hidden; the backend has no SMS provider. Add a pluggable SMS backend in `MedicusCommon` (like `medicus_common/email.py`) and an OTP endpoint in `MedicusUser/src/api/auth_routes/`, then re-enable the method in `MediApp/components/auth/signup/ui/SignUpMethodSelector.tsx` (screens: `PhoneSignUpForm.tsx`, `app/(SignUp)/VerificationScreen.tsx`).
+- [ ] **Phone number verification** (same SMS backend), then `hooks/settings/useAccountProfileData.ts`.
+- [ ] **Google / Apple sign-in** (OAuth in `MedicusUser`, `handleSSOSignUp` in the sign-up form).
+- [ ] **Two-factor authentication** (TOTP in `MedicusUser`, then a row in Account settings).
+
+### Patient profile
+
+These screens exist under `MediApp/app/tabs/patients/` but are not finished. They are hidden by `NOT_IMPLEMENTED` in `MediApp/components/features/patient/profile/patientTab/PatientSectionGroup.tsx`.
+
+- [ ] Patient status (`patient-status.tsx`)
+- [ ] Appointment reminders (`appointment-reminders.tsx`)
+- [ ] Emergency access, break-glass sharing (`emergency-access.tsx`)
+- [ ] Insurance (`insurance.tsx`)
+- [ ] Address management for dependents (`hooks/patient/data/useContactFormOperations.ts`)
+
+### Settings
+
+These screens exist under `MediApp/app/tabs/settings/` but are not linked from the Settings menu (`settings/index.tsx`) yet.
+
+- [ ] Profile, Security, Privacy, Linked devices
+- [ ] Communication preferences (SMS contact method)
+- [ ] Appearance (dark mode), Language and region
+- [ ] Help: live chat and quick guides
+- [ ] About: terms, privacy policy and licenses pages
+- [ ] Invite friends and referral rewards (`invite.tsx`)
+- [ ] Notifications screen: show an error and a retry button when the notification service is unreachable, instead of default toggles
+
+### Documents and content
+
+- [ ] Multi-page scanning with edge detection. "Scan" currently stores one camera photo in the vault (`MediApp/app/tabs/documents/index.tsx`).
+- [ ] A real content source for the **Feed** tab; it shows curated articles bundled with the app (`MediApp/app/tabs/feed/index.tsx`, images in `assets/images/feed/`).
+- [ ] Sample data for first-time users: example records, clearly labelled, on a user's own empty screens.
+- [ ] **MediKnowledge in the app:** a Doctor-tab screen to upload, list and delete knowledge documents (the API exists: `/api/MedicusAI/knowledge/documents`). Also support scanned PDFs (OCR with the vision model), DOCX, and `pgvector` for large libraries (`MedicusAI/src/tools/mediknowledge/`).
+
+### Platform
+
 - [ ] Web dashboard for doctors
 - [ ] FHIR import and export
 - [ ] Helm chart for Kubernetes
 - [ ] More languages in the assistants and the app
-
-The app hides features until they work end to end. [ROADMAP.md](ROADMAP.md) lists every unfinished feature with the code where it starts: a good place to pick a first contribution.
 
 Have an idea? [Open a discussion](../../discussions) or upvote an existing issue.
 

@@ -239,6 +239,7 @@ class CloudPayload(Payload):
     api_version: Optional[str] = Field(None, description="API version")
     status_code: int = Field(200, description="HTTP status code (200 for success, 400/500 for errors)")
     message: Optional[str] = Field(None, description="Response message")
+    transcript: Optional[str] = Field(None, description="Speech-to-text of the user's voice message (audio turns)")
 
     # Multiple media attachments support
     media_ids: Optional[list[str]] = Field(None, description="List of media IDs for multiple attachments")

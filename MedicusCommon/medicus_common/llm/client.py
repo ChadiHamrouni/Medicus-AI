@@ -217,9 +217,22 @@ async def transcribe(audio_path: Path) -> str:
     return (result if isinstance(result, str) else getattr(result, "text", "")).strip()
 
 
+async def embed(texts: list[str]) -> Optional[list[list[float]]]:
+    """Embedding vectors via any /v1/embeddings server, or None when EMBEDDING_MODEL is unset."""
+    s = get_llm_settings()
+    if not s.embedding_model or not texts:
+        return None
+    base_url = s.embedding_base_url or (s.base_url if s.provider != "openai" else None)
+    client = AsyncOpenAI(api_key=s.embedding_api_key or s.resolved_api_key or "not-needed",
+                         base_url=base_url, timeout=s.timeout_seconds)
+    response = await client.embeddings.create(model=s.embedding_model, input=texts)
+    return [item.embedding for item in sorted(response.data, key=lambda d: d.index)]
+
+
 async def synthesize_speech(text: str, voice: Optional[str] = None) -> bytes:
     """Text-to-speech via OpenAI or any server implementing /v1/audio/speech."""
     s = get_llm_settings()
     client = _audio_client(s.resolved_tts_provider, s.tts_base_url, s.tts_api_key)
-    response = await client.audio.speech.create(model=s.tts_model, voice=voice or s.tts_voice, input=text)
+    response = await client.audio.speech.create(model=s.tts_model, voice=voice or s.tts_voice, input=text,
+                                                response_format=s.tts_format)
     return await response.aread() if hasattr(response, "aread") else await response.read()

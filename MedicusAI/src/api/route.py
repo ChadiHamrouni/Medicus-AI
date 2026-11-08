@@ -87,7 +87,10 @@ async def chat(payload: AppPayload, current_user: User = Depends(get_current_use
 
     logger.info(f"/chat [{handler_type}] {result.status_code} in {time.time() - t_start:.2f}s")
     if result.status_code == 200:
-        return JSONResponse(status_code=status.HTTP_200_OK, content={"status_code": 200, "text_io": result.text_io})
+        content = {"status_code": 200, "text_io": result.text_io}
+        if result.transcript:  # voice turns: what was heard, so the app's rolling history has the real words
+            content["transcript"] = result.transcript
+        return JSONResponse(status_code=status.HTTP_200_OK, content=content)
 
     logger.error(f"/chat [{handler_type}] handler error: {result.message}")
     return JSONResponse(

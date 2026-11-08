@@ -24,7 +24,7 @@ export const SignUpMethodSelector: React.FC<SignUpMethodSelectorProps> = ({
       primary: true,
       disabled: false,
     },
-    // Phone sign-up needs SMS verification, which the backend does not provide yet (see ROADMAP.md).
+    // Phone sign-up needs SMS verification, which the backend does not provide yet (see the README roadmap).
   ];
 
   return (

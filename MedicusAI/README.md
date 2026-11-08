@@ -4,7 +4,7 @@ The assistant service: chat and voice turns for patients (**MediAid**) and docto
 
 | Path | What lives there |
 |---|---|
-| `src/api/` | `/chat` endpoint, realtime voice (optional), MediBench evaluation API (off unless `MEDIBENCH_API_KEY` is set) |
+| `src/api/` | `/chat` endpoint, live voice WebSocket (`live/`), MediBench evaluation API (off unless `MEDIBENCH_API_KEY` is set) |
 | `src/assistants/` | The four agents and their instructions/skills (`mediaid`, `medisolo`, `medidoc`, `docsolo`) |
 | `src/tools/` | Tools the agents call: records, booking, prescriptions, exams, procedures, support, triage |
 | `src/security/` | `scope.py` (server-side conversation authorization) and `tool_guard.py` (identity injection, argument repair, error handling) |

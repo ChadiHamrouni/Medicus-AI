@@ -25,7 +25,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 Provider = Literal["openai", "openai_compatible", "litellm"]
 AudioProvider = Literal["openai", "openai_compatible", "none"]
 
-ROLES = ("tools", "text", "guardrail", "triage", "vision", "lab", "doc", "summary")
+ROLES = ("tools", "text", "guardrail", "triage", "vision", "lab", "doc", "summary", "voice")
 
 # Default role -> key in core/config.json "llms" section (used only for provider=openai).
 _CONFIG_KEYS = {
@@ -37,6 +37,7 @@ _CONFIG_KEYS = {
     "lab": "lab_llm",
     "doc": "doc_llm",
     "summary": "text_llm",
+    "voice": "tools_llm",
 }
 
 
@@ -58,6 +59,8 @@ class LLMSettings(BaseSettings):
     model_lab: Optional[str] = Field(None, alias="LLM_MODEL_LAB")
     model_doc: Optional[str] = Field(None, alias="LLM_MODEL_DOC")
     model_summary: Optional[str] = Field(None, alias="LLM_MODEL_SUMMARY")
+    # Assistant model for live voice conversations; a smaller model answers faster.
+    model_voice: Optional[str] = Field(None, alias="LLM_MODEL_VOICE")
 
     # OpenAI reasoning models: defaults to "low". Other providers: sent only when set;
     # "none" turns off thinking on local models (Qwen3, DeepSeek-R1, gpt-oss via Ollama/vLLM).
@@ -82,10 +85,13 @@ class LLMSettings(BaseSettings):
     tts_api_key: Optional[str] = Field(None, alias="TTS_API_KEY")
     tts_model: str = Field("gpt-4o-mini-tts", alias="TTS_MODEL")
     tts_voice: str = Field("sage", alias="TTS_VOICE")
+    tts_format: str = Field("wav", alias="TTS_FORMAT")
 
-    # Live voice (WebRTC) currently relies on the OpenAI Realtime API.
-    realtime_enabled: bool = Field(False, alias="REALTIME_ENABLED")
-    realtime_model: str = Field("gpt-realtime-mini", alias="REALTIME_MODEL")
+    # Embeddings for the doctors' knowledge base (optional: keyword search works without).
+    # Any server implementing /v1/embeddings; defaults to the LLM server and key.
+    embedding_model: Optional[str] = Field(None, alias="EMBEDDING_MODEL")
+    embedding_base_url: Optional[str] = Field(None, alias="EMBEDDING_BASE_URL")
+    embedding_api_key: Optional[str] = Field(None, alias="EMBEDDING_API_KEY")
 
     @property
     def resolved_api_key(self) -> Optional[str]:

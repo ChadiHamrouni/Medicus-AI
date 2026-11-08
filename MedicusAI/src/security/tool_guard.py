@@ -66,7 +66,8 @@ _INJECTORS: dict[str, Callable[[dict], Any]] = {
 
 # Tools whose doctor_id refers to the acting doctor (private data). Elsewhere a
 # doctor_id is a public directory lookup (profile, free slots) and stays free.
-_SELF_DOCTOR_TOOLS = {"get_doctor_performance_metrics", "search_conversations"}
+# search_doctor_knowledge: the conversation's doctor, so a patient only reaches their own doctor's material.
+_SELF_DOCTOR_TOOLS = {"get_doctor_performance_metrics", "search_conversations", "search_doctor_knowledge"}
 _SELF_ACTOR_TOOLS = {"report_medical_procedure_detail"}  # actor_id = acting doctor
 
 _PROCEDURE_OWNER = "SELECT patient_id FROM public.medical_procedures WHERE id = $1"

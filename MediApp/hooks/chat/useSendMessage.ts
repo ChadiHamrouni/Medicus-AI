@@ -9,6 +9,7 @@ import { Attachment } from '@/types';
 import { getConvoStatus } from '@/services/medicusAI';
 import { logger, createTemporaryMessage } from '@/utils';
 import { useCallback, useEffect, useRef } from 'react';
+import { useFocusEffect } from 'expo-router';
 
 
 // ============================================================================
@@ -140,6 +141,14 @@ export const useSendMessage = ({
     recentMessagesRef.current = [];
     lastCompactSummaryRef.current = convoContext?.compact_summary;
   }, [conversation?.id]);
+
+  // Reset window when the chat comes back into view: messages may have been added elsewhere
+  // (e.g. a live voice conversation). An empty window makes the server load history from the DB.
+  useFocusEffect(
+    useCallback(() => {
+      recentMessagesRef.current = [];
+    }, [])
+  );
 
   // Reset window when compaction fires (compact_summary changes)
   useEffect(() => {
@@ -444,7 +453,8 @@ export const useSendMessage = ({
         // Append this turn to the rolling window (bounded by server-side compaction)
         recentMessagesRef.current = [
           ...recentMessagesRef.current,
-          { role: 'user' as const, content: userText },
+          // Voice turns: keep what was actually said, not the "Voice message" label
+          { role: 'user' as const, content: saraResponse.transcript || userText },
           { role: 'assistant' as const, content: saraResponse.text_io ?? '' },
         ];
 

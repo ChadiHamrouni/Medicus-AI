@@ -307,35 +307,14 @@ const ChatScreen: React.FC = () => {
     }
   }, [isInitialLoading, dot1Opacity, dot2Opacity, dot3Opacity]);
 
+  // Live voice conversation with Sara (self-hosted speech-to-text and text-to-speech).
   const handleRealTimePress = () => {
-    if (!isDoctor || !conversation) {
+    if (!conversation) {
       return;
     }
-
-    // WebRTC is doctor-only, always use medidoc
-    // - If patient_id is null: docsolo (doctor talking to Sara directly)
-    // - If patient_id is set: medidoc (doctor talking to patient through Sara)
-    const assistant = 'medidoc';
-
-    const rtcParams = {
-      convoId: conversation.id,
-      assistant,
-      patientId: conversation.patient_id?.toString() || '',
-      doctorId: conversation.doctor_id?.toString() || '',
-      userId: currentUserId?.toString() || '',
-      senderId: currentUserId?.toString() || '',
-    };
-
-    console.log('[RTC] Starting WebRTC session with params:', {
-      ...rtcParams,
-      conversationType: rtcParams.patientId
-        ? 'medidoc (doctor-patient)'
-        : 'docsolo (doctor-sara)',
-    });
-
     router.push({
-      pathname: '/sara-rtc',
-      params: rtcParams,
+      pathname: '/voice-call',
+      params: { convoId: conversation.id, title: 'Sara' },
     } as any);
   };
 
@@ -461,9 +440,8 @@ const ChatScreen: React.FC = () => {
 
           <MessageInput
             onSend={handleSendText}
-            // Live voice calls use the OpenAI Realtime API; hidden unless the server enables it
-            onRealTimePress={process.env.EXPO_PUBLIC_REALTIME_ENABLED === 'true' ? handleRealTimePress : undefined}
-            showRTCButton={isDoctor}
+            onRealTimePress={handleRealTimePress}
+            showRTCButton
           />
         </View>
       </KeyboardAvoidingView>

@@ -12,7 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, Any
 
 from src.api.route import router as agent_router
-from src.api.realtime import realtime_router
+from src.api.live import live_router
+from src.api.knowledge import router as knowledge_router
 from src.api.medibench.common import medibench_enabled
 from src.services.socketio_client import socketio_broadcast_service
 
@@ -188,7 +189,8 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(agent_router, prefix="/api/MedicusAI", tags=["tools"])
-    app.include_router(realtime_router, prefix="/api/MedicusAI", tags=["realtime"])
+    app.include_router(live_router, prefix="/api/MedicusAI", tags=["live-voice"])
+    app.include_router(knowledge_router, prefix="/api/MedicusAI")
     
     # MediBench evaluation API (separate project); mounted only when MEDIBENCH_API_KEY is set.
     if medibench_enabled():

@@ -25,7 +25,7 @@ export const PatientSectionGroup: React.FC<PatientSectionGroupProps> = ({
   isViewingAsDoctor = false,
   className = 'mt-3 mx-4',
 }) => {
-  // Sections without a working screen yet are hidden (listed in ROADMAP.md for contributors).
+  // Sections without a working screen yet are hidden (listed in the README roadmap).
   const filteredSections = sectionKeys
     .map(key => sections.find(s => s.key === key))
     .filter((s): s is PatientSection => !!s && !NOT_IMPLEMENTED.has(s.key));

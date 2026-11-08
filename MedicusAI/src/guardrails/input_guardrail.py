@@ -1,3 +1,6 @@
+from contextvars import ContextVar
+from typing import Optional
+
 from pydantic import BaseModel
 
 from agents import Agent, Runner, GuardrailFunctionOutput, RunContextWrapper
@@ -54,6 +57,10 @@ Set is_violation=false for:
 Be precise — do NOT flag legitimate medical requests or casual conversation.
 """
 
+# Set for the duration of a turn that runs the assistant on another model role (e.g. live
+# voice), so the classifier uses that model too instead of loading the main one.
+guardrail_model_role: ContextVar[Optional[str]] = ContextVar("guardrail_model_role", default=None)
+
 _guardrail_agent = Agent(
     name="InputGuardrail",
     model=get_agent_model("guardrail"),
@@ -75,8 +82,11 @@ async def input_guardrail(
     latest = _latest_user_text(input)
     if not latest.strip():
         return GuardrailFunctionOutput(output_info=None, tripwire_triggered=False)
+    role = guardrail_model_role.get()
+    classifier = _guardrail_agent if role is None else _guardrail_agent.clone(
+        model=get_agent_model(role), model_settings=get_model_settings(role))
     result = await Runner.run(
-        starting_agent=_guardrail_agent,
+        starting_agent=classifier,
         input=latest,
     )
     check: GuardrailCheck = result.final_output

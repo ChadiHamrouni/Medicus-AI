@@ -3,6 +3,7 @@
 from medicus_common.llm.client import (
     ModelNotConfiguredError,
     complete,
+    embed,
     get_agent_model,
     get_client,
     get_model_settings,
@@ -19,6 +20,7 @@ __all__ = [
     "LLMSettings",
     "ModelNotConfiguredError",
     "complete",
+    "embed",
     "get_agent_model",
     "get_client",
     "get_llm_settings",
