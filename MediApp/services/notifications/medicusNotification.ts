@@ -5,9 +5,7 @@
 
 import { logger, env, authenticatedFetch } from '@/utils';
 
-const MEDICUS_NOTIFICATION_API_URL =
-  process.env.EXPO_PUBLIC_MEDICUS_NOTIFICATION_API_URL ||
-  `${env.medicusApiBaseUrl}/api/MedicusNotification`;
+const MEDICUS_NOTIFICATION_API_URL = env.medicusNotificationApiBaseUrl;
 
 // ============================================================================
 // ENUMS - Match backend spec exactly

@@ -1,5 +1,7 @@
 import Message from '@/components/features/chat/Message';
+import { useAuthContext } from '@/contexts/AuthContext';
 import { IMessage } from '@/types';
+import { UserRole } from '@/types/auth';
 import React, { RefObject, useEffect, useRef } from 'react';
 import { FlatList, View, Text, ActivityIndicator } from 'react-native';
 
@@ -32,6 +34,8 @@ function ChatMessages({
   isLoadingMore = false,
   isSaraConversation = false,
 }: ChatMessagesProps) {
+  const { authState } = useAuthContext();
+  const isDoctor = authState.user?.role === UserRole.DOCTOR;
   const reversedMessages = [...messages].reverse();
 
   const newestMessageIdRef = useRef<string | number | null>(null);
@@ -60,11 +64,14 @@ function ChatMessages({
 
   const renderMessage = ({ item }: { item: IMessage }) => {
     // Determine sender name based on whether it's Sara direct or Sara on behalf of someone
+    // In a doctor's copy of a patient thread Sara works for the doctor, not for the patient.
     const senderName =
       item.senderId === 'assistant'
         ? isSaraConversation
           ? 'Sara AI Assistant'
-          : `Sara - on behalf of ${otherParticipant}`
+          : isDoctor
+            ? 'Sara - your clinical assistant'
+            : `Sara - on behalf of ${otherParticipant}`
         : 'Me';
 
     return (

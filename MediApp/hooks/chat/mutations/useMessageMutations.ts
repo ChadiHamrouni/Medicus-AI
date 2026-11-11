@@ -369,6 +369,9 @@ export function useSendTextToSaraMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    // Never auto-retry: the server keeps running the turn after a client timeout, so a retry
+    // runs the agent twice and can repeat its actions (bookings, prescriptions).
+    retry: false,
     mutationFn: async (payload: SendTextToSaraPayload) => {
       logger.info('Send text to Sara attempt started', {
         component: 'useSendTextToSara',

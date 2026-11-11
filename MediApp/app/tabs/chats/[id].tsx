@@ -13,7 +13,6 @@ import {
   Animated,
   Image,
   KeyboardAvoidingView,
-  Platform,
   Text,
   TouchableOpacity,
   View,
@@ -339,7 +338,9 @@ const ChatScreen: React.FC = () => {
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        // Android is edge-to-edge since SDK 54, so the window no longer resizes for the
+        // keyboard and 'height' leaves the input hidden behind it: pad on both platforms.
+        behavior="padding"
         keyboardVerticalOffset={0}
       >
         {/* Header */}

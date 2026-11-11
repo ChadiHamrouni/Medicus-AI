@@ -110,6 +110,33 @@ export function useSocketIOMessages({
                 const isFromUser = newMessage.senderId === currentUserId;
                 const isAiResponse = messageData.type === 'ai_response';
 
+                // The server's echo of a text message this device just sent. Its sender id is the
+                // account's user id while the pending bubble carries the profile id, so the id check
+                // above misses it for most accounts: match the pending bubble by text and replace it.
+                if (!isAiResponse && messageData.role === 'user' && newMessage.text) {
+                  const echoKey = QUERY_KEYS.messages.infinite(convoId, pageSize);
+                  const cached = queryClient.getQueryData(echoKey) as any;
+                  const cachedMessages = cached?.pages?.flatMap((page: any) => page.results || []) ?? [];
+                  // Already reconciled by the send request (it stores the server id as realMessageId).
+                  if (cachedMessages.some((msg: any) => msg.realMessageId && String(msg.realMessageId) === String(newMessage.id))) {
+                    return;
+                  }
+                  const pending = cachedMessages.find((msg: any) => {
+                    const id = String(msg.id);
+                    const isTemp = msg.isTemporary || id.startsWith('temp-') || id.startsWith('temp_');
+                    return isTemp && msg.text === newMessage.text;
+                  });
+                  if (pending) {
+                    updateMessage(pending.id, {
+                      ...newMessage,
+                      senderId: pending.senderId,
+                      isTemporary: false,
+                      uploadStatus: 'sent',
+                    });
+                    return;
+                  }
+                }
+
                 if (isFromUser && !isAiResponse) {
                   logger.info(
                     '⏭️ Skipping Socket.IO message from current user (already optimistically added)',

@@ -2,8 +2,10 @@ import { StandardScreenLayout } from '@/components/shared/layout';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
+import { env } from '@/utils/infrastructure/env';
 import {
   Alert,
+  Platform,
   ScrollView,
   Share,
   Text,
@@ -17,12 +19,13 @@ const InviteSettings: React.FC = () => {
   const [emailInput, setEmailInput] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
 
-  const appStoreUrl = 'https://apps.apple.com/app/Medicus/id123456789';
+  // Store links come from EXPO_PUBLIC_APP_STORE_URL / EXPO_PUBLIC_PLAY_STORE_URL (or the website).
+  const appStoreUrl = (Platform.OS === 'ios' ? env.appStoreUrl : env.playStoreUrl) ?? env.websiteUrl;
   const inviteCode = 'MEDI2024';
 
   const shareMessage = `Hey! I've been using Medicus to manage my healthcare and it's been amazing. It helps me stay connected with my doctors, manage my health records, and keep track of everything in one place. 
 
-You should check it out: ${appStoreUrl}
+You should check it out${appStoreUrl ? `: ${appStoreUrl}` : '!'}
 
 Use my invite code "${inviteCode}" when you sign up to get premium features free for your first month!`;
 

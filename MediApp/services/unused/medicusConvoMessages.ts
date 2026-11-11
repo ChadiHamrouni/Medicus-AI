@@ -25,7 +25,7 @@ export interface MessagesPage {
   offset: number;
 }
 
-const BASE = env.medicusConvoApiBaseUrl; // Ensure this is set (e.g. https://api.yourdomain.com/api/MedicusConvo)
+const BASE = env.medicusConvoApiBaseUrl; // from EXPO_PUBLIC_MEDICUS_API_BASE_URL (utils/infrastructure/env.ts)
 
 /**
  * Fetch a page of messages for a conversation.

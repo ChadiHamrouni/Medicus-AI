@@ -5,7 +5,8 @@
       "distribution": "internal",
       "ios": {
         "simulator": true
-      }
+      },
+      "environment": "development"
     },
     "preview": {
       "android": {
@@ -14,14 +15,16 @@
       "distribution": "internal",
       "ios": {
         "simulator": false
-      }
+      },
+      "environment": "preview"
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "SKIP_POSTINSTALL": "true",
         "RCT_NEW_ARCH_ENABLED": "1"
-      }
+      },
+      "environment": "production"
     }
   },
   "submit": {

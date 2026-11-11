@@ -137,7 +137,7 @@ async function postSara(
   });
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 180000); // 180s timeout for Sara AI processing (increased from 60s)
+  const timeout = setTimeout(() => controller.abort(), 300000); // 300s: agent turns on local models can take minutes
 
   let resp: Response;
   let rawBody: string | undefined;

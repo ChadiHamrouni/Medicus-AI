@@ -189,10 +189,13 @@ const NotificationSettings: React.FC = () => {
   >('undetermined');
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
+  // Defaults until the saved settings load from the server.
   const [channels, setChannels] = useState<ChannelSettings>({
     push_enabled: true,
     email_enabled: true,
     sms_enabled: false,
+    quiet_hours_enabled: false,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   });
 
   const [categories, setCategories] = useState<Record<string, boolean>>({});

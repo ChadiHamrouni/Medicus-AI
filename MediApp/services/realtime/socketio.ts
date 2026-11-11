@@ -67,32 +67,16 @@ class SocketIOService {
   private connectionListeners: Map<string, SocketIOEventCallback> = new Map();
   private compactionListeners: Map<string, SocketIOEventCallback> = new Map();
 
-  // Get base URL from medicusConvoApiBaseUrl (strip /api/MedicusConvo path)
-  // Example: https://api.medicusai.tech/api/MedicusConvo -> https://api.medicusai.tech
-  private readonly SOCKET_URL = env.medicusConvoApiBaseUrl.replace(
-    '/api/MedicusConvo',
-    ''
-  );
+  // Socket.IO server: EXPO_PUBLIC_SOCKETIO_URL, or the API gateway (see utils/infrastructure/env.ts).
+  private readonly SOCKET_URL = env.socketUrl;
 
   public static getInstance(): SocketIOService {
     if (!SocketIOService.instance) {
       SocketIOService.instance = new SocketIOService();
 
-      // Debug: Log Socket.IO URL configuration
       logger.info('Socket.IO URL configured', {
         component: 'SocketIOService',
         socketUrl: SocketIOService.instance.SOCKET_URL,
-        medicusConvoApiBaseUrl: env.medicusConvoApiBaseUrl,
-        hasApiBaseUrl: !!process.env.API_BASE_URL,
-        hasEnvSocketUrl: !!process.env.EXPO_PUBLIC_SOCKETIO_URL,
-        apiBaseUrl: process.env.API_BASE_URL,
-        envSocketUrl: process.env.EXPO_PUBLIC_SOCKETIO_URL,
-        allEnvVars: {
-          API_BASE_URL: process.env.API_BASE_URL,
-          EXPO_PUBLIC_SOCKETIO_URL: process.env.EXPO_PUBLIC_SOCKETIO_URL,
-          EXPO_PUBLIC_MEDICUS_CONVO_API_BASE_URL:
-            process.env.EXPO_PUBLIC_MEDICUS_CONVO_API_BASE_URL,
-        },
       });
     }
     return SocketIOService.instance;

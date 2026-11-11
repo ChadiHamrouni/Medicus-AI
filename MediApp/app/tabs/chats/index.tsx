@@ -21,6 +21,15 @@ import SaraBadge from '@/components/features/conversation/SaraBadge';
 import { Button } from '@/components/shared';
 import { getOnlineStatus, formatConversationTimestamp } from '@/utils/date';
 
+// The preview is plain text: drop Markdown markers (**bold**, `code`, # headings, list bullets, links).
+const stripMarkdown = (text?: string) =>
+  (text || '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_`~]+/g, '')
+    .replace(/^\s*(#{1,6}|[-+]|\d+\.)\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const ConversationsScreen: React.FC = () => {
   const router = useRouter();
   const { authState } = useAuthContext();
@@ -142,7 +151,7 @@ const ConversationsScreen: React.FC = () => {
 
     const lastMessage = isSara
       ? 'I can help you with health questions, appointments, and more.'
-      : conversation.lastMessage || 'No messages yet';
+      : stripMarkdown(conversation.lastMessage) || 'No messages yet';
 
     return (
       <TouchableOpacity

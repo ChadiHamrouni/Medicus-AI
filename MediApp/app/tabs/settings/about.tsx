@@ -4,45 +4,31 @@ import React from 'react';
 import {
   Image,
   Linking,
+  Platform,
   Pressable,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { StandardScreenLayout } from '@/components/shared/layout/StandardScreenLayout';
+import { env } from '@/utils/infrastructure/env';
 
 const AboutSettings: React.FC = () => {
   const router = useRouter();
 
-  const appVersion = '1.0.0-beta';
-  const buildNumber = '2025.08.11';
-  const lastUpdated = 'September 1, 2025';
+  // Links come from EXPO_PUBLIC_* variables (utils/infrastructure/env.ts); unset ones are hidden.
+  const appVersion = env.appVersion;
+  const storeUrl = Platform.OS === 'ios' ? env.appStoreUrl : env.playStoreUrl;
+  const open = (url?: string) => () => url && Linking.openURL(url);
 
-  const handleOpenTerms = () => {
-    Linking.openURL('https://mediapp.com/terms-of-service');
-  };
-
-  const handleOpenPrivacyPolicy = () => {
-    Linking.openURL('https://mediapp.com/privacy-policy');
-  };
+  const handleOpenTerms = open(env.termsUrl);
+  const handleOpenPrivacyPolicy = open(env.privacyUrl);
 
   const handleOpenLicenses = () => {};
 
-  const handleOpenWebsite = () => {
-    Linking.openURL('https://medicusai.tech');
-  };
-
-  const handleContactSupport = () => {
-    Linking.openURL('mailto:support@mediapp.com?subject=About MediApp');
-  };
-
-  const handleRateApp = () => {
-    // iOS App Store or Google Play Store URL
-    const appStoreUrl = 'https://apps.apple.com/app/mediapp/id123456789';
-
-    // Detect platform and open appropriate store
-    Linking.openURL(appStoreUrl);
-  };
+  const handleOpenWebsite = open(env.websiteUrl);
+  const handleContactSupport = open(env.supportEmail && `mailto:${env.supportEmail}?subject=Medicus`);
+  const handleRateApp = open(storeUrl);
 
   const aboutItems = [
     {
@@ -50,14 +36,14 @@ const AboutSettings: React.FC = () => {
       description: 'Read our terms and conditions',
       icon: 'file-document-outline',
       onPress: handleOpenTerms,
-      disabled: true,
+      disabled: !env.termsUrl,
     },
     {
       title: 'Privacy Policy',
       description: 'How we protect and use your data',
       icon: 'shield-account',
       onPress: handleOpenPrivacyPolicy,
-      disabled: true,
+      disabled: !env.privacyUrl,
     },
     {
       title: 'Third-party Licenses',
@@ -68,24 +54,24 @@ const AboutSettings: React.FC = () => {
     },
     {
       title: 'Visit Our Website',
-      description: 'Learn more about MediApp',
+      description: 'Learn more about Medicus',
       icon: 'web',
       onPress: handleOpenWebsite,
-      disabled: false,
+      disabled: !env.websiteUrl,
     },
     {
       title: 'Rate This App',
       description: 'Help us improve by leaving a review',
       icon: 'star',
       onPress: handleRateApp,
-      disabled: true,
+      disabled: !storeUrl,
     },
     {
       title: 'Contact Support',
       description: 'Get help or report issues',
       icon: 'email',
       onPress: handleContactSupport,
-      disabled: true,
+      disabled: !env.supportEmail,
     },
   ];
 
@@ -125,18 +111,6 @@ const AboutSettings: React.FC = () => {
                 <Text className="text-sm text-gray-600">Version</Text>
                 <Text className="text-sm font-semibold text-gray-900">
                   {appVersion}
-                </Text>
-              </View>
-              <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-sm text-gray-600">Build</Text>
-                <Text className="text-sm font-semibold text-gray-900">
-                  {buildNumber}
-                </Text>
-              </View>
-              <View className="flex-row justify-between items-center">
-                <Text className="text-sm text-gray-600">Last Updated</Text>
-                <Text className="text-sm font-semibold text-gray-900">
-                  {lastUpdated}
                 </Text>
               </View>
             </View>

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function PdfViewerScreen() {
   const router = useRouter();
@@ -17,13 +18,18 @@ export default function PdfViewerScreen() {
   const uri = params.uri as string;
   const title = params.title as string;
 
-  // Determine source based on platform
-  // On iOS, WebView handles PDF URLs directly.
-  // On Android, we use Google Docs viewer for remote URLs.
-  const source =
-    Platform.OS === 'android' && uri?.startsWith('http')
-      ? { uri: `https://docs.google.com/gview?embedded=true&url=${uri}` }
-      : { uri: uri };
+  // iOS: WebView renders PDFs natively. Android's WebView cannot, so remote PDFs open in the
+  // system browser tab, which hands them to the device's PDF viewer. Medical documents are never
+  // sent to a third-party viewing service.
+  const openExternally = Platform.OS === 'android' && !!uri?.startsWith('http');
+  const source = { uri };
+
+  useEffect(() => {
+    if (!openExternally) return;
+    WebBrowser.openBrowserAsync(uri)
+      .catch(error => console.warn('Could not open PDF: ', error))
+      .finally(() => router.back());
+  }, [openExternally, uri, router]);
 
   if (!uri) {
     return (
@@ -59,6 +65,11 @@ export default function PdfViewerScreen() {
 
       {/* WebView */}
       <View className="flex-1 bg-gray-100">
+        {openExternally ? (
+          <View className="flex-1 justify-center items-center bg-white">
+            <ActivityIndicator size="large" color="#F05C0C" />
+          </View>
+        ) : (
         <WebView
           source={source}
           style={{ flex: 1 }}
@@ -74,6 +85,7 @@ export default function PdfViewerScreen() {
             console.warn('WebView error: ', nativeEvent);
           }}
         />
+        )}
       </View>
     </SafeAreaView>
   );

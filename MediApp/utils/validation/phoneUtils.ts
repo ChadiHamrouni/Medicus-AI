@@ -94,50 +94,25 @@ export const parsePhoneNumber = (
 };
 
 /**
- * Gets the country code from the user's IP address
- * Falls back to 'US' if detection fails
+ * Gets the user's country from the device's region setting (e.g. "en-US" -> "US").
+ * Runs entirely on the device: no network call, no third-party service sees the user's IP.
+ * Falls back to 'US' when the region is unknown or not in the country list.
  */
-export const getCountryFromIP = async (): Promise<string> => {
+export const getDeviceCountry = (): string => {
   try {
-    // Use ipapi.co for IP-based geolocation (free tier available)
-    const response = await fetch('https://ipapi.co/json/', {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale || '';
+    const region = locale.split(/[-_]/).find(part => /^[A-Z]{2}$/.test(part));
+    if (region && countryCodes.some(c => c.code === region)) {
+      return region;
     }
-
-    const data = await response.json();
-    const countryCode = data.country_code;
-
-    // Verify that we have this country in our list
-    const country = countryCodes.find(c => c.code === countryCode);
-
-    if (country) {
-      logger.info('Country detected from IP', {
-        component: 'phoneUtils',
-        countryCode,
-        countryName: country.name,
-      });
-      return countryCode;
-    }
-
-    logger.warn('Detected country code not found in country list, using US', {
-      component: 'phoneUtils',
-      detectedCode: countryCode,
-    });
-    return 'US';
   } catch (error) {
-    logger.error('Failed to detect country from IP, using US', error as Error, {
-      component: 'phoneUtils',
-    });
-    return 'US';
+    logger.warn('Could not read the device region, using US', { component: 'phoneUtils' });
   }
+  return 'US';
 };
+
+/** @deprecated Kept for compatibility: now reads the device region instead of calling an IP service. */
+export const getCountryFromIP = async (): Promise<string> => getDeviceCountry();
 
 /**
  * Builds full international phone number with country code
