@@ -53,6 +53,24 @@ async def trigger_emergency_protocol(
     patient_id = medical_context.patient_id
     recorded_at = datetime.now(timezone.utc)
 
+    # The model sometimes calls this twice in one turn: return the alert raised moments ago
+    # instead of dispatching a duplicate.
+    if patient_id is not None:
+        recent = await db_manager.fetchrow(
+            """SELECT id, recorded_at FROM public.medical_events
+               WHERE patient_id = $1 AND event_type = 'EMERGENCY_ALERT' AND recorded_at > now() - interval '2 minutes'
+               ORDER BY recorded_at DESC LIMIT 1""",
+            patient_id,
+        )
+        if recent:
+            return EmergencyAlertResponse(
+                status="activated",
+                message="Emergency protocol already active for this patient. Medical team notified.",
+                protocol_id=f"EMG-{recent['id']}",
+                dispatched_at=recent["recorded_at"].isoformat(),
+                priority="CRITICAL",
+            )
+
     try:
         # 1. Prepare clinical payload
         emergency_payload = {

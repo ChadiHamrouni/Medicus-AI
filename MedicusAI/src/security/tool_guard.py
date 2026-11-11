@@ -13,9 +13,11 @@ For each FunctionTool:
 A prompt-injected model therefore cannot read or write another patient's data.
 """
 
+import ast
 import copy
 import dataclasses
 import json
+from contextvars import ContextVar
 from typing import Any, Awaitable, Callable, Optional
 
 from agents import Agent, FunctionTool
@@ -177,6 +179,10 @@ def _matches(value: Any, schema: dict) -> bool:
     }.get(t, False)
 
 
+# Argument structure (keys and types, no values) of the current tool call, for failure logs.
+_last_arg_shape: ContextVar[str] = ContextVar("_last_arg_shape", default="")
+
+
 def _tool_failure_handler(tool_name: str):
     """Log tool exceptions for operators; give the model actionable text for bad input.
 
@@ -192,20 +198,23 @@ def _tool_failure_handler(tool_name: str):
             if isinstance(cause, PydanticValidationError):
                 # Field paths and messages only: input values may be patient data.
                 problems = "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in cause.errors()[:8])
-                logger.warning(f"[TOOL] {tool_name} invalid arguments from model: {problems}")
-                return (f"The tool rejected the arguments ({problems}). "
-                        "Fix the arguments to match the tool schema and call it again.")
+                logger.warning(f"[TOOL] {tool_name} invalid arguments from model: {problems}; structure sent: {_last_arg_shape.get()}")
+                return (f"NOT DONE: the tool rejected the arguments ({problems}). Nothing was saved. "
+                        "Fix the arguments to match the tool schema and call it again; "
+                        "do not tell the user this action succeeded.")
             logger.warning(f"[TOOL] {tool_name} invalid arguments ({type(cause).__name__})")
         if isinstance(error, ModelBehaviorError):
-            logger.warning(f"[TOOL] {tool_name} invalid arguments from model")
-            return ("The arguments did not match the tool's JSON schema (wrong field names, types or nesting). "
-                    "Re-read the parameter schema and call the tool again with corrected arguments.")
+            logger.warning(f"[TOOL] {tool_name} invalid arguments from model; structure sent: {_last_arg_shape.get()}")
+            return ("NOT DONE: the arguments did not match the tool's JSON schema (wrong field names, types or "
+                    "nesting). Nothing was saved. Re-read the parameter schema and call the tool again with "
+                    "corrected arguments; do not tell the user this action succeeded.")
         if isinstance(error, (PydanticValidationError, MedicusValidationError, ValueError)):
             logger.warning(f"[TOOL] {tool_name} rejected input: {error}")
             detail = str(error).split("\n    For further information")[0][:600]
-            return f"The tool rejected the arguments: {detail}. Fix the arguments and call the tool again."
+            return (f"NOT DONE: the tool rejected the arguments: {detail}. Nothing was saved. "
+                    "Fix the arguments and call the tool again; do not tell the user this action succeeded.")
         logger.error(f"[TOOL] {tool_name} failed: {type(error).__name__}: {error}", exc_info=error)
-        return "An error occurred while running the tool. Please try again."
+        return "NOT DONE: an error occurred while running the tool. Nothing was saved; do not tell the user it succeeded."
     return handler
 
 
@@ -231,6 +240,8 @@ def guard_tool(tool: FunctionTool) -> FunctionTool:
         if not isinstance(args, dict):
             return _error("Invalid tool arguments.")
         args = _coerce_to_schema(args, full_schema, full_schema.get("$defs", {}))
+        args = _wrap_flat_args(args, full_schema, hidden)
+        args = _coerce_to_schema(args, full_schema, full_schema.get("$defs", {}))
 
         for name in hidden:
             if name == "doctor_id":
@@ -246,15 +257,24 @@ def guard_tool(tool: FunctionTool) -> FunctionTool:
         # Nested argument objects supplied by the model (bookings, prescriptions, ...).
         # Injected objects are trusted as-is: medical_context legitimately has no
         # patient in doctor-only conversations.
-        for key, value in args.items():
+        # The ids are filled in whenever the object's schema has them (the model does not
+        # know them and usually leaves them out), and always overwritten when it sends them.
+        defs = full_schema.get("$defs", {})
+        props = full_schema.get("properties", {})
+        for key in list(args):
             if key in hidden:
                 continue
+            sub = _resolve(props.get(key, {}), defs)
+            sub_props = sub.get("properties", {})
+            if isinstance(args[key], str) and sub_props:
+                args[key] = _object_from_text(args[key], sub, hidden_ids=("patient_id", "doctor_id"))
+            value = args[key]
             if isinstance(value, dict):
-                if "patient_id" in value:
+                if "patient_id" in value or "patient_id" in sub_props:
                     if ctx.get("patient_id") is None:
                         return _error("No patient is associated with this conversation.")
                     value["patient_id"] = ctx["patient_id"]
-                if "doctor_id" in value and ctx.get("doctor_id") is not None:
+                if ("doctor_id" in value or "doctor_id" in sub_props) and ctx.get("doctor_id") is not None:
                     value["doctor_id"] = ctx["doctor_id"]
 
         if ownership:
@@ -269,6 +289,7 @@ def guard_tool(tool: FunctionTool) -> FunctionTool:
                 return _error("Record not found.")
 
         logger.info(f"[TOOL] {tool.name} called by {ctx.get('actor_role')} (assistant={ctx.get('assistant')})")
+        _last_arg_shape.set(json.dumps(_key_shape({k: v for k, v in args.items() if k not in hidden})))
         return _to_model_text(await original(tool_ctx, json.dumps(args, default=str)))
 
     set_function_tool_failure_error_function(tool, _tool_failure_handler(tool.name))
@@ -280,6 +301,68 @@ def guard_tool(tool: FunctionTool) -> FunctionTool:
     set_function_tool_failure_error_function(guarded, _tool_failure_handler(tool.name))
     setattr(guarded, _GUARDED_FLAG, True)
     return guarded
+
+
+def _resolve(schema: dict, defs: dict) -> dict:
+    if isinstance(schema, dict) and "$ref" in schema:
+        return defs.get(schema["$ref"].split("/")[-1], {})
+    return schema if isinstance(schema, dict) else {}
+
+
+def _wrap_flat_args(args: dict, schema: dict, hidden: list[str]) -> dict:
+    """Small models often drop the wrapper object: they send {"start_time": ..} for a tool
+    whose only argument is `medical_visit: {"start_time": ..}`. When the tool has exactly
+    one object parameter, it is missing, and the stray keys are its fields, nest them."""
+    defs = schema.get("$defs", {})
+    visible = {k: v for k, v in schema.get("properties", {}).items() if k not in hidden}
+    objects = [k for k, v in visible.items() if _resolve(v, defs).get("type") == "object"
+               or "properties" in _resolve(v, defs)]
+    if len(objects) != 1 or objects[0] in args:
+        return args
+    name = objects[0]
+    fields = set(_resolve(visible[name], defs).get("properties", {}))
+    stray = {k: v for k, v in args.items() if k not in visible and k not in hidden}
+    if stray and set(stray) <= fields:
+        args = {k: v for k, v in args.items() if k not in stray}
+        args[name] = stray
+    return args
+
+
+def _object_from_text(text: str, schema: dict, hidden_ids: tuple = ()) -> Any:
+    """An object argument sent as text: JSON, a Python-style dict, or (when the object has a
+    single field the model must supply) just that field's value, e.g. a start time."""
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    try:
+        parsed = ast.literal_eval(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except (ValueError, SyntaxError):
+        pass
+    # Strict schemas list every field as required; the ones the model must really supply
+    # have no default and are not nullable.
+    fields = schema.get("properties", {})
+    def optional(f: dict) -> bool:
+        return "default" in f or any(o.get("type") == "null" for o in f.get("anyOf", []))
+    required = [r for r in schema.get("required", []) if r not in hidden_ids and not optional(fields.get(r, {}))]
+    if len(required) == 1:
+        return {required[0]: text}
+    return text
+
+
+def _key_shape(value: Any, depth: int = 0) -> Any:
+    """Argument structure without values (values can be patient data): for operator logs."""
+    if depth > 3:
+        return "…"
+    if isinstance(value, dict):
+        return {k: _key_shape(v, depth + 1) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_key_shape(value[0], depth + 1)] if value else []
+    return type(value).__name__
 
 
 def _to_model_text(result: Any) -> Any:

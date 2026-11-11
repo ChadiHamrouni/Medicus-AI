@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Initialize the OpenAI client
 openai_client = OpenAIClient().openai_client()
 config = Config()
-image_llm = config.get("llms", "image_llm")
+image_llm = config.get("llms", "vision")
 
 
 async def get_image_insights(document: Document) -> MediaMetadata:

@@ -10,6 +10,9 @@ from medicus_common.core.logging_config import logger
 from medicus_common.models.medical.visits import TimeSlot
 from medicus_common.utils.type_conversion import to_datetime
 
+# Upper bound on returned appointment slots, to keep the tool output short.
+_MAX_SLOTS = 40
+
 
 @function_tool
 async def find_free_slots(
@@ -52,6 +55,13 @@ async def find_free_slots(
         Defaults to 15 days from now.
     duration : int, optional
         Defaults to 30.
+
+    RETURNS
+    -------
+    Bookable appointment slots in chronological order (at most 40), each `duration` minutes
+    long, e.g. [{"start": "...T10:00:00Z", "end": "...T10:30:00Z"}, ...]. A requested time is
+    available exactly when a slot starts at that time. To see a specific day, pass
+    start_date/end_date for that day.
 
     HARD RULES
     ----------
@@ -148,7 +158,8 @@ async def find_free_slots(
         logger.debug(f"[FIND_FREE_SLOTS] Computed {len(free_slots)} raw free slots")
 
         # 4. TZ Correction: Use UTC 'now' for filtering
-        future_free_slots = [slot for slot in free_slots if slot[0].astimezone(timezone.utc) > now]
+        # Keep ranges that are still open (a range that started earlier today can still have later slots).
+        future_free_slots = [slot for slot in free_slots if slot[1].astimezone(timezone.utc) > now]
         logger.debug(f"[FIND_FREE_SLOTS] After filtering past slots: {len(future_free_slots)} future slots")
 
         # Sort and Merge
@@ -164,7 +175,15 @@ async def find_free_slots(
             logger.debug(f"Available: {start.strftime('%Y-%m-%d %H:%M')} to {end.strftime('%H:%M')} UTC")
         logger.debug("-------------------------------------------\n")
 
-        time_slots = [TimeSlot(start=start, end=end) for start, end in merged_intervals]
+        # Bookable appointments, not free ranges: small models misread "08:30-12:30" as
+        # "only 08:30". Each slot is one appointment of `duration`, starting on that grid.
+        time_slots = []
+        for start, end in merged_intervals:
+            slot = start
+            while slot + _duration_td <= end and len(time_slots) < _MAX_SLOTS:
+                if slot > now:
+                    time_slots.append(TimeSlot(start=slot, end=slot + _duration_td))
+                slot += _duration_td
 
         # If no slots found, return helpful error message
         if not time_slots:

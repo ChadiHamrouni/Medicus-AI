@@ -14,7 +14,7 @@ config = Config()
 
 async def gen_text_embedding(text: str) -> List[float]:
     """Get embeddings from OpenAI API."""
-    model = config.get("embeddings", "text_embedding", "model")
+    model = config.get("embedding", "model")
 
     try:
         response = openai_client.embeddings.create(model=model, input=text)

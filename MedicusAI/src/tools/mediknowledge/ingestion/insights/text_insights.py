@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # Initialize the OpenAI client
 openai_client = OpenAIClient().client()
 config = Config()
-text_llm = config.get("llms", "text_llm")
+text_llm = config.get("llms", "text")
 
 
 async def get_text_insights(document: Document | str) -> MediaMetadata:

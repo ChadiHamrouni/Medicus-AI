@@ -22,7 +22,7 @@ The CATEGORY_MAP has been deprecated in favor of database-driven categorization.
 import hashlib
 from typing import Optional, Literal, List, Any, Dict
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 # ============================================================
@@ -61,6 +61,11 @@ class VitalThresholdConfig(BaseModel):
 class VitalValue(BaseModel):
     vital_text: str = Field(..., description="the text entered as the vital name in the language of the clinician")
     vital_value: str = Field(..., description="the value reported of the vital")
+
+    @field_validator("vital_value", mode="before")
+    @classmethod
+    def _number_to_text(cls, v: Any) -> Any:
+        return str(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v
 
 class MedicalVitalEntry(BaseModel):
     """Generic medical entry representing a single vital/measurement.
@@ -132,13 +137,25 @@ class MedicalVitalsInput(BaseModel):
     - Offline batch: Map to standardized vital_keys
 
     Example vital_values:
-        {"tension artérielle": "135/85", "pouls": 72, "température": 37.2}
-        {"blood pressure": "120/80", "heart rate": 68}
+        [{"vital_text": "blood pressure", "vital_value": "120/80"},
+         {"vital_text": "heart rate", "vital_value": "68"}]
+    A {"blood pressure": "120/80", "heart rate": 68} mapping is also accepted and converted.
     """
     vital_values: List[VitalValue] = Field(
         ...,
-        description="Vitals as described by the clinician in their language. Keys are vital names, values are measurements."
+        description=('List of {"vital_text": <vital name, in the clinician language>, "vital_value": <measurement>}, '
+                     'e.g. [{"vital_text": "blood pressure", "vital_value": "150/95"}]')
     )
+
+    @field_validator("vital_values", mode="before")
+    @classmethod
+    def _mapping_to_list(cls, v: Any) -> Any:
+        # Models often send {"blood pressure": "150/95"} instead of the list form.
+        if isinstance(v, dict) and not {"vital_text", "vital_value"} <= v.keys():
+            return [{"vital_text": k, "vital_value": val} for k, val in v.items()]
+        if isinstance(v, dict):
+            return [v]
+        return v
 
     model_config = ConfigDict(extra='forbid')
 

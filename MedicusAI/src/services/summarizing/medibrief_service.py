@@ -131,11 +131,17 @@ Produce a CLINICAL BRIEF that:
 
 
 def _build_prompt(messages: list[dict], existing_summary: str | None) -> str:
-    clinical_msgs = [m for m in messages if not m.get("processed_by_ai")]
-    scan_insights = [m for m in messages if m.get("processed_by_ai")]
+    # Document/image analyses are tagged by MediScan. (processed_by_ai is set on every reply
+    # Sara writes, so it cannot tell analyses from ordinary conversation.)
+    def is_scan(m: dict) -> bool:
+        return isinstance(m.get("content"), dict) and m["content"].get("source") == "mediscan"
 
+    clinical_msgs = [m for m in messages if not is_scan(m)]
+    scan_insights = [m for m in messages if is_scan(m)]
+
+    speaker = {"user": "PATIENT", "assistant": "SARA (assistant)"}
     messages_text = "\n".join(
-        f"[{m['role'].upper()}] {_extract_text(m['content'])}" for m in clinical_msgs
+        f"[{speaker.get(m['role'], m['role'].upper())}] {_extract_text(m['content'])}" for m in clinical_msgs
     )
 
     scan_block = ""
@@ -223,6 +229,14 @@ async def run_medibrief(doctor_conversation_id: str) -> str:
             logger.error(f"[MEDIBRIEF] LLM returned None for conversation {doctor_conversation_id}")
             return "Summary generation failed."
 
+        # The model spreads the brief over several fields: keep all of them.
+        brief = "\n\n".join(part for part in [
+            result.summary,
+            "Key symptoms: " + "; ".join(result.key_symptoms) if result.key_symptoms else "",
+            f"Timeline: {result.timeline}" if result.timeline else "",
+            f"Notes: {result.notes}" if result.notes else "",
+        ] if part)
+
         # 4. Persist to dialog.medibrief_summaries
         async with db_manager.get_connection() as conn:
             await conn.execute(
@@ -233,7 +247,7 @@ async def run_medibrief(doctor_conversation_id: str) -> str:
                 """,
                 doctor_conversation_id,
                 mirror_id_str,
-                result.summary,
+                brief,
                 from_id,
                 to_id,
             )
@@ -242,7 +256,7 @@ async def run_medibrief(doctor_conversation_id: str) -> str:
             f"[MEDIBRIEF] conversation={doctor_conversation_id} "
             f"mirror={mirror_id_str} messages={from_id}→{to_id}"
         )
-        return result.summary
+        return brief
 
     except Exception as exc:
         logger.error(

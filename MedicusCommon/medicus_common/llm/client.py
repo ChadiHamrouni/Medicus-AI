@@ -39,6 +39,36 @@ def model_name(role: str) -> str:
     return get_llm_settings().model_for(role)
 
 
+def _repair_tool_names(response: Any, tools: list) -> Any:
+    """Map tool calls with a made-up namespace back to the real tool.
+
+    Smaller open models sometimes call `mediclinic.report_medical_vitals` (or
+    `functions.report_medical_vitals`) instead of `report_medical_vitals`; the Agents SDK
+    then aborts the whole turn with "Tool ... not found". When the name is unknown but
+    its last segment is a real tool, use that.
+    """
+    names = {getattr(t, "name", None) for t in tools or []}
+    for item in getattr(response, "output", None) or []:
+        name = getattr(item, "name", None)
+        if getattr(item, "type", None) != "function_call" or not name or name in names:
+            continue
+        short = re.split(r"[.:/]", name)[-1]
+        if short in names:
+            logger.info(f"[LLM] tool name {name!r} repaired to {short!r}")
+            item.name = short
+    return response
+
+
+def _with_tool_name_repair(model_cls: type) -> type:
+    class Repaired(model_cls):  # type: ignore[misc, valid-type]
+        async def get_response(self, system_instructions, input, model_settings, tools, *args, **kwargs):
+            response = await super().get_response(system_instructions, input, model_settings, tools, *args, **kwargs)
+            return _repair_tool_names(response, tools)
+
+    Repaired.__name__ = model_cls.__name__
+    return Repaired
+
+
 def get_agent_model(role: str) -> Any:
     """Model object for the OpenAI Agents SDK, honouring LLM_PROVIDER."""
     s = get_llm_settings()
@@ -50,10 +80,10 @@ def get_agent_model(role: str) -> Any:
     if s.provider == "openai_compatible":
         from agents import OpenAIChatCompletionsModel
 
-        return OpenAIChatCompletionsModel(model=name, openai_client=get_client())
+        return _with_tool_name_repair(OpenAIChatCompletionsModel)(model=name, openai_client=get_client())
     from agents.extensions.models.litellm_model import LitellmModel
 
-    return LitellmModel(model=name, api_key=s.resolved_api_key, base_url=s.base_url)
+    return _with_tool_name_repair(LitellmModel)(model=name, api_key=s.resolved_api_key, base_url=s.base_url)
 
 
 def _reasoning_extra(role: str, model: Optional[str] = None) -> dict[str, Any]:

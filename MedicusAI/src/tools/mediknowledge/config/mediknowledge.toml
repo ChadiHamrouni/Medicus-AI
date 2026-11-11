@@ -1,0 +1,79 @@
+# MediKnowledge: retrieval-augmented answers from each doctor's own documents.
+#
+# Every tunable value of the knowledge pipeline lives in this file. Edit it and restart the AI
+# service; nothing here is a secret. To use a different file (per environment, for experiments),
+# point MEDIKNOWLEDGE_CONFIG at it. Values are validated on startup (see settings.py).
+#
+# Model names are not set here: they come from the deployment's LLM settings
+# (LLM_MODEL*, EMBEDDING_MODEL), so the pipeline follows whatever provider Medicus uses.
+# Connection settings (ELASTICSEARCH_URL, storage credentials) stay in the environment.
+
+[ingestion]
+# File types a doctor can upload to the knowledge base.
+supported_extensions = ["pdf", "txt", "md", "rtf"]
+# Uploads larger than this are rejected (megabytes).
+max_file_mb = 20
+
+# Elasticsearch pipeline: two-level chunking ("small-to-big").
+# Small retriever chunks are embedded and searched; the larger generative chunk they belong to
+# is what the assistant reads. Sizes are in tokens (o200k tokenizer).
+[chunking.generative]
+size = 300
+overlap = 40
+
+[chunking.retriever]
+size = 80
+overlap = 15
+
+# PostgreSQL pipeline (the index the assistant searches by default): single-level chunks.
+# Sizes are in characters (~900 characters ≈ 200 tokens).
+[chunking.postgres]
+size_chars = 900
+overlap_chars = 150
+max_chunks_per_document = 2000
+
+[embedding]
+# Must match the embedding model's output size (nomic-embed-text: 768, text-embedding-3-small: 1536).
+# The EMBEDDING_DIMENSION environment variable overrides it.
+dimension = 768
+# Texts sent to the embedding model per request.
+batch_size = 32
+
+[index]
+# Elasticsearch indices are per country: "<country><suffix>", e.g. us_gen and us_ret.
+generative_suffix = "_gen"
+retriever_suffix = "_ret"
+shards = 1
+# 0 for a single-node cluster (local development); 1 or more in production.
+replicas = 0
+# Vector similarity and HNSW graph parameters: higher m / ef_construction = better recall,
+# slower indexing and more memory.
+similarity = "cosine"
+hnsw_m = 16
+hnsw_ef_construction = 128
+
+[retrieval]
+# Passages returned to the assistant per search.
+top_k = 5
+# Candidates taken from each ranking (keyword and vector) before fusion.
+candidates = 20
+# Elasticsearch kNN: nearest neighbours examined per shard (>= candidates; higher = better recall).
+knn_num_candidates = 100
+# Reciprocal rank fusion constant: higher values flatten the difference between top ranks.
+rrf_k = 60
+# Excerpts added automatically to a patient's turn when the doctor has documents.
+context_excerpts = 3
+# PostgreSQL pipeline: at most this many chunks are compared by embedding per search.
+max_vector_chunks = 5000
+
+# Models used while ingesting (image descriptions, table summaries). "role" picks the model
+# from the LLM settings: text -> LLM_MODEL_TEXT, vision -> LLM_MODEL_VISION.
+[llms.text]
+role = "text"
+temperature = 0.2
+max_tokens = 800
+
+[llms.vision]
+role = "vision"
+temperature = 0.2
+max_tokens = 800

@@ -511,7 +511,8 @@ class MedicalExamOrder(BaseModel):
     doctor_id: int = Field(..., description="Doctor ID")
     ordered_exam: str = Field(..., description="Ordered exam name")
     exam_type: str = Field(..., description="Exam type")
-    healthcare_provider_name: Optional[str] = Field(None, description="Healthcare provider name")
+    healthcare_provider_name: Optional[str] = Field(
+        None, description="Lab or facility, ONLY if the clinician named one. Never invent or assume a provider: leave null.")
 
     model_config = ConfigDict(extra='forbid')
 

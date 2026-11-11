@@ -8,12 +8,16 @@ from medicus_common.core.database import db_manager
 from medicus_common.core.logging_config import logger
 from medicus_common.llm import embed
 
+from src.tools.mediknowledge.config.settings import get_settings
+
 SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".md"}
-MAX_FILE_BYTES = 20 * 1024 * 1024
-MAX_CHUNKS_PER_DOCUMENT = 2000
-CHUNK_CHARS = 900          # ~200 tokens: precise enough to quote, large enough to keep context
-CHUNK_OVERLAP = 150
-EMBED_BATCH = 32
+# Tunable values: [ingestion], [chunking.postgres] and [embedding] in config/mediknowledge.toml.
+_S = get_settings()
+MAX_FILE_BYTES = _S.ingestion.max_file_mb * 1024 * 1024
+MAX_CHUNKS_PER_DOCUMENT = _S.chunking.postgres.max_chunks_per_document
+CHUNK_CHARS = _S.chunking.postgres.size_chars
+CHUNK_OVERLAP = _S.chunking.postgres.overlap_chars
+EMBED_BATCH = _S.embedding.batch_size
 
 
 # ---------------------------------------------------------------------------
@@ -26,7 +30,7 @@ def extract_text(data: bytes, filename: str) -> str:
     if ext not in SUPPORTED_EXTENSIONS:
         raise ValueError(f"Unsupported file type '{ext or '?'}'. Use PDF, TXT or MD.")
     if len(data) > MAX_FILE_BYTES:
-        raise ValueError("File too large (max 20 MB)")
+        raise ValueError(f"File too large (max {_S.ingestion.max_file_mb} MB)")
     if ext == ".pdf":
         import fitz  # PyMuPDF
 

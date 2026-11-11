@@ -9,10 +9,10 @@ from src.tools.mediknowledge.config.config import Config
 
 config = Config()
 
-GEN_CHUNK_SIZE = config.get("prompts", "gen_chunk_size")
-GEN_OVERLAP = config.get("prompts", "gen_overlap")
-RETRIEVER_CHUNK_SIZE = config.get("prompts", "retriever_chunk_size")
-RETRIEVER_OVERLAP = config.get("prompts", "retriever_overlap")
+GEN_CHUNK_SIZE = config.get("chunking", "generative", "size")
+GEN_OVERLAP = config.get("chunking", "generative", "overlap")
+RETRIEVER_CHUNK_SIZE = config.get("chunking", "retriever", "size")
+RETRIEVER_OVERLAP = config.get("chunking", "retriever", "overlap")
 
 
 async def create_text_nodes(documents: Document|List[Document]) -> tuple[list[GNode], list[RNode]]:

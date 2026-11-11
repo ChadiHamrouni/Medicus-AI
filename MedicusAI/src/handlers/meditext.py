@@ -346,8 +346,8 @@ _READ_ONLY_PREFIXES = ("get_", "show_", "find_", "search_")
 _READ_ONLY_TOOLS = {"medibrief_summarize", "mediexplain_explain"}
 
 _VERIFY_NOTE = (
-    "System check: your previous reply said an action was completed, but no tool was called, "
-    "so nothing was saved. Call the correct tool now to actually perform the action the user asked for. "
+    "System check: your previous reply said an action was completed, but the matching tool did not run "
+    "successfully, so nothing was saved. Call the correct tool now to actually perform the action the user asked for. "
     "If you cannot, tell the user plainly that it was not done. Do not claim success without a tool call."
 )
 _NOT_DONE = ("I wasn't able to complete that action, so nothing was changed. "
@@ -360,24 +360,70 @@ def _called_tools(result) -> list[str]:
             if getattr(getattr(i, "raw_item", None), "name", None)]
 
 
+def _field(obj, key):
+    return obj.get(key) if isinstance(obj, dict) else getattr(obj, key, None)
+
+
+_FAILED_OUTPUT = re.compile(r"^\s*(?:\{\s*\"error\"|NOT DONE|An error occurred|The tool rejected)", re.IGNORECASE)
+
+
+def _succeeded_tools(result) -> set[str]:
+    """Tools called this turn whose output is not an error (a rejected call saved nothing)."""
+    items = getattr(result, "new_items", None) or []
+    names = {_field(getattr(i, "raw_item", None), "call_id"): _field(getattr(i, "raw_item", None), "name")
+             for i in items if _field(getattr(i, "raw_item", None), "name")}
+    ok = set()
+    for i in items:
+        if getattr(i, "type", "") != "tool_call_output_item":
+            continue
+        name = names.get(_field(getattr(i, "raw_item", None), "call_id"))
+        if name and not _FAILED_OUTPUT.search(str(getattr(i, "output", "") or "")):
+            ok.add(name)
+    return ok
+
+
 def _is_write(name: str) -> bool:
     return not name.startswith(_READ_ONLY_PREFIXES) and name not in _READ_ONLY_TOOLS
+
+
+# A claim names an action; only the matching tool backs it up ("prescribed" is not proven by
+# a delete_prescription call). Verbs not listed here accept any successful write.
+_CLAIM_TOOLS = {
+    "prescribed": ("create_prescription",),
+    "booked": ("create_booking", "update_booking"),
+    "rescheduled": ("update_booking",),
+    "ordered": ("order_medical_exam",),
+    "cancelled": ("delete_booking", "cancel_medical_procedure", "delete_prescription", "close_support"),
+    "canceled": ("delete_booking", "cancel_medical_procedure", "delete_prescription", "close_support"),
+}
+_CLAIM_VERB = re.compile(r"\b(" + "|".join(_CLAIM_TOOLS) + r")\b", re.IGNORECASE)
+
+
+def _unbacked_claims(reply: str, succeeded: set[str]) -> list[str]:
+    if not _ACTION_CLAIM.search(reply or ""):
+        return []
+    missing = [v.lower() for v in _CLAIM_VERB.findall(reply or "")
+               if not succeeded.intersection(_CLAIM_TOOLS[v.lower()])]
+    if missing:
+        return sorted(set(missing))
+    return [] if any(_is_write(n) for n in succeeded) else ["completed"]
 
 
 async def _verify_claimed_actions(agent, context, history, text_input, result, reply, p_name, d_name):
     """Never let the assistant claim an action it did not perform.
 
-    Small models sometimes answer "the prescription has been cancelled" without calling
-    any tool. If a reply claims an action and no write tool ran this turn, retry once with
-    an explicit correction; if the retry still performs nothing, say so honestly.
+    Small models sometimes answer "the prescription has been updated" without calling the
+    tool, or after the tool rejected the call. If a reply claims an action that no successful
+    matching tool call backs up, retry once with an explicit correction; if the retry still
+    does not perform it, say so honestly.
     """
-    if (not _ACTION_REQUEST.search(text_input or "") or not _ACTION_CLAIM.search(reply or "")
-            or any(_is_write(n) for n in _called_tools(result))):
+    if not _ACTION_REQUEST.search(text_input or ""):
         return result, reply
-    if not any(_is_write(getattr(t, "name", "")) for t in agent.tools):
+    claims = _unbacked_claims(reply, _succeeded_tools(result))
+    if not claims or not any(_is_write(getattr(t, "name", "")) for t in agent.tools):
         return result, reply
 
-    logger.warning("[VERIFY] reply claimed an action without a write tool call: retrying once")
+    logger.warning(f"[VERIFY] reply claimed {claims} without a successful matching tool call: retrying once")
     retry_agent = agent.clone(input_guardrails=[])  # the correction is ours, not user input
     retry = await run_text(
         text_input=_VERIFY_NOTE,
@@ -385,7 +431,10 @@ async def _verify_claimed_actions(agent, context, history, text_input, result, r
         history=history + [{"role": "user", "content": text_input}, {"role": "assistant", "content": reply}],
         context=context,
     )
-    if retry and not isinstance(retry, str) and any(_is_write(n) for n in _called_tools(retry)):
-        return retry, scrub_identifiers(retry.final_output, patient_name=p_name, doctor_name=d_name)
-    logger.warning("[VERIFY] retry performed no action: replying that nothing was done")
+    if retry and not isinstance(retry, str):
+        retry_reply = scrub_identifiers(retry.final_output, patient_name=p_name, doctor_name=d_name)
+        done = _succeeded_tools(result) | _succeeded_tools(retry)
+        if not _unbacked_claims(retry_reply, done) and any(_is_write(n) for n in _succeeded_tools(retry)):
+            return retry, retry_reply
+    logger.warning("[VERIFY] retry did not perform the action: replying that nothing was done")
     return result, _NOT_DONE

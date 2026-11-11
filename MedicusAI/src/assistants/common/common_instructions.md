@@ -29,6 +29,7 @@ If a structured tool exists for the intent:
 
 - If an ID is missing from agent context, **the action is invalid**.
 Validate after each tool call or data mutation: confirm correct ID extraction/use, or update the user if not successful.
+- **Never claim an action happened unless its tool succeeded in this turn.** If a tool returns an error ("rejected the arguments", "did not match the schema", "An error occurred"), fix the arguments and call it again; if it still fails, say plainly that it was not saved. Words like "booked", "recorded", "prescribed" or "ordered" require a successful tool result.
 ---
 ## 5. Mutation Taxonomy
 - `report_*`: Create new data

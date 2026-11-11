@@ -8,9 +8,9 @@ Status categorization:
 - previous: Medications that have been discontinued (end_date < today)
 """
 
-from typing import Optional, List, Literal
+from typing import Any, Optional, List, Literal
 from datetime import date, datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 
 
 # Type alias for medication status
@@ -114,6 +114,20 @@ class Medication(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
+    @model_validator(mode="before")
+    @classmethod
+    def _accept_common_shapes(cls, v: Any) -> Any:
+        # Models often send {"name": .., "dose": .., "duration": 90}: map to the field names.
+        if isinstance(v, dict):
+            v = dict(v)
+            for alias, field in (("name", "medication_name"), ("medication", "medication_name"), ("dose", "dosage")):
+                if alias in v and field not in v:
+                    v[field] = v.pop(alias)
+            for k in ("dosage", "frequency", "duration"):
+                if isinstance(v.get(k), (int, float)) and not isinstance(v.get(k), bool):
+                    v[k] = f"{v[k]} days" if k == "duration" else str(v[k])
+        return v
+
 
 class MedicalPrescription(BaseModel):
     """Prescription document model.
@@ -125,10 +139,10 @@ class MedicalPrescription(BaseModel):
     prescribed at the same time by the same doctor.
     """
     patient_id: int = Field(..., description="Unique identifier for the patient")
-    patient_name: str = Field(..., description="Patient full name")
+    patient_name: Optional[str] = Field(None, description="Patient full name")
     doctor_id: int = Field(..., description="Unique identifier for the doctor")
-    doctor_name: str = Field(..., description="Doctor full name")
-    date_prescribed: str = Field(..., description="Date when the prescription was made")
+    doctor_name: Optional[str] = Field(None, description="Doctor full name")
+    date_prescribed: Optional[str] = Field(None, description="Ignored: prescriptions are always dated today")
     medications: List[Medication] = Field(..., description="List of medications prescribed")
     notes: Optional[str] = Field(None, description="Additional notes regarding the prescription")
 

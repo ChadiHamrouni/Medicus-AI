@@ -14,9 +14,13 @@ from medicus_common.core.database import db_manager
 from medicus_common.core.logging_config import logger
 from medicus_common.llm import embed
 
-CANDIDATES = 20        # per ranking, before fusion
-RRF_K = 60
-MAX_VECTOR_CHUNKS = 5000
+from src.tools.mediknowledge.config.settings import get_settings
+
+# Tunable values: [retrieval] in config/mediknowledge.toml.
+_S = get_settings().retrieval
+CANDIDATES = _S.candidates        # per ranking, before fusion
+RRF_K = _S.rrf_k
+MAX_VECTOR_CHUNKS = _S.max_vector_chunks
 
 # Words that carry no meaning in a question (English and French, the demo languages).
 _STOPWORDS = set("""

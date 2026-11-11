@@ -366,9 +366,9 @@ class MedicalVisit(BaseModel):
     """
     doctor_id: int = Field(..., description="Doctor ID")
     patient_id: int = Field(..., description="Patient ID")
-    start_time: datetime = Field(..., description="Appointment start time")
-    end_time: datetime = Field(..., description="Appointment end time")
-    visit_type: str = Field(..., description="Visit type (e.g., 'consultation', 'follow-up')")
+    start_time: datetime = Field(..., description="Appointment start time (the time the user chose)")
+    end_time: Optional[datetime] = Field(None, description="Appointment end time; defaults to start_time + 30 minutes")
+    visit_type: str = Field("consultation", description="Visit type (e.g., 'consultation', 'follow-up')")
     visit_details: Optional[str] = Field(None, description="Visit details/reason")
 
     model_config = ConfigDict(extra='forbid')

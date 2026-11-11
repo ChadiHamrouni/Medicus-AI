@@ -50,7 +50,8 @@ async def mediscan_handler(payload: AppPayload, redis=None) -> Tuple[CloudPayloa
         message_data = await ConvoService.add_convo_message(
             convo_id=payload.convo_id,
             role="assistant",
-            content_body={"type": "app", "text_io": ai_text, "assistant": payload.assistant, "convo_id": payload.convo_id},
+            content_body={"type": "app", "text_io": ai_text, "assistant": payload.assistant, "convo_id": payload.convo_id,
+                          "source": "mediscan"},  # lets MediBrief tell document analyses from chat replies
             processed_by_ai=True,
         )
 

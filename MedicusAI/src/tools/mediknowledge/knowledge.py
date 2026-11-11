@@ -2,6 +2,7 @@ from agents import function_tool
 
 from medicus_common.core.logging_config import logger
 
+from src.tools.mediknowledge.config.settings import get_settings
 from src.tools.mediknowledge.hybrid_search import hybrid_search
 
 
@@ -37,7 +38,7 @@ async def search_doctor_knowledge(doctor_id: int, query: str) -> dict:
       found: number of excerpts
     """
     try:
-        hits = await hybrid_search(doctor_id, query, limit=5)
+        hits = await hybrid_search(doctor_id, query, limit=get_settings().retrieval.top_k)
     except Exception as e:
         logger.error(f"[MEDIKNOWLEDGE] search failed for doctor {doctor_id}: {e}")
         return {"results": [], "found": 0, "error": "The doctor's documents could not be searched right now."}

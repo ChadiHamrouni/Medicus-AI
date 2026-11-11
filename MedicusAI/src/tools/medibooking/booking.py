@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 import asyncpg
@@ -80,8 +80,10 @@ async def create_booking(medical_visit: MedicalVisit):
     ----------
     medical_visit : MedicalVisit
         Booking details.
-        - start_time MUST come from find_free_slots output
-        - end_time MUST come from find_free_slots output
+        - start_time: the time the user chose, inside a free range returned by find_free_slots
+          (one of the slot start times returned by find_free_slots)
+        - end_time: optional; defaults to start_time + 30 minutes
+        - visit_type: optional, e.g. "follow-up" (defaults to "consultation")
 
     HARD RULES
     ----------
@@ -89,9 +91,12 @@ async def create_booking(medical_visit: MedicalVisit):
     - MUST NOT re-call find_free_slots after user selection
     - MUST NOT parse dates from natural language
     - MUST NOT create tentative or placeholder bookings
+    - NEVER tell the user an appointment is booked or confirmed unless this tool returned
+      "Appointment booked successfully"
     """
     start_time = _as_utc(get_attr(medical_visit, "start_time"))
-    end_time = _as_utc(get_attr(medical_visit, "end_time"))
+    raw_end = get_attr(medical_visit, "end_time")
+    end_time = _as_utc(raw_end) if raw_end else start_time + timedelta(minutes=30)
     visit_type = normalize_visit_type(get_attr(medical_visit, "visit_type") or "consultation")
     visit_details = get_attr(medical_visit, "visit_details")
     patient_id = get_attr(medical_visit, "patient_id")

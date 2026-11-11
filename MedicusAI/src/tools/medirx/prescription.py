@@ -41,12 +41,12 @@ async def create_prescription(
         Structured prescription payload containing:
         - patient_id (int): Patient receiving the prescription
         - doctor_id (int): Prescribing clinician
-        - date_prescribed (date): Must NOT be in the future
+        - date_prescribed: optional, ignored (prescriptions are dated today)
         - medications (List[Medication]):
-            - name (str): Medication name
+            - medication_name (str): Medication name
             - dosage (str): Exact dosage (e.g., "500 mg")
             - frequency (str): Dosing frequency (e.g., "TID", "once daily")
-            - duration (int | str): Duration of therapy
+            - duration (str): Duration of therapy, e.g. "90 days"
             - purpose (str, optional): Clinical indication
         - notes (str, optional): Additional instructions or warnings
 
@@ -69,6 +69,9 @@ async def create_prescription(
     - Never hallucinate future dates
     - Never infer missing dosage or frequency
     - If required data is missing, request clarification instead of guessing
+    - This tool does NOT stop or replace existing prescriptions. When the doctor changes a
+      dose, say the earlier prescription is still on file (or remove it with
+      delete_prescription if asked); never claim it was discontinued automatically
     """
 
 

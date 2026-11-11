@@ -4,14 +4,14 @@ from typing import Tuple, List, Dict
 import logging
 from src.tools.mediknowledge.models.document import GNode, RNode, MediaType
 from src.tools.mediknowledge.config.clients import ElasticsearchClient
-from src.tools.mediknowledge.ingestion.indexing.es_index import create_index
+from src.tools.mediknowledge.ingestion.indexing.es_index import create_index, index_names
 
 logger = logging.getLogger(__name__)
 es_client = ElasticsearchClient().es_client()
 
 
 async def store_generative_node(node: GNode) -> None:
-    index_name = node.metadata.country_id.lower() + "_gen"
+    index_name = index_names(node.metadata.country_id)[0]
     # Ensure the index exists before storing the node
     await create_index(es_client, node.metadata.country_id)
     try:
@@ -24,7 +24,7 @@ async def store_generative_node(node: GNode) -> None:
 
 
 async def store_retriever_node(node: RNode) -> None:
-    index_name = node.metadata.country_id.lower() + "_ret"
+    index_name = index_names(node.metadata.country_id)[1]
     # Ensure the index exists before storing the node
     await create_index(es_client, node.metadata.country_id)
     try:

@@ -1,159 +1,105 @@
+"""Elasticsearch indices for the MediKnowledge pipeline (one pair per country).
+
+    <country><generative_suffix>  generative nodes: the passages the assistant reads
+    <country><retriever_suffix>   retriever nodes: small embedded chunks that are searched
+
+Shards, replicas, vector similarity and HNSW parameters come from mediknowledge.toml.
+"""
+
+import asyncio
 import logging
 from typing import Any, Dict, Tuple
 
 from src.tools.mediknowledge.config.clients import ElasticsearchClient
-from src.tools.mediknowledge.config.config import Config
+from src.tools.mediknowledge.config.settings import get_settings
 
-# Configure logging at the application level
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-embedding_dimension = Config().get("Ingestion", "embedding_dimension", default=1536)
+_METADATA = {
+    "type": "object",
+    "properties": {
+        "doctor_id": {"type": "keyword"},
+        "country_id": {"type": "keyword"},
+        "specialty_id": {"type": "keyword"},
+        "created_at": {"type": "date"},
+    },
+}
+
+
+def _index_settings() -> Dict[str, Any]:
+    s = get_settings().index
+    return {"number_of_shards": s.shards, "number_of_replicas": s.replicas}
 
 
 async def generative_index_mappings() -> Dict[str, Any]:
-    """
-    Get the mapping configuration for generation indices with support for documents.
-    """
+    """Mapping for generative nodes (full passages with their document metadata)."""
     return {
-        "settings": {
-            "number_of_shards": 1,
-            "number_of_replicas": 1,
-        },
+        "settings": _index_settings(),
         "mappings": {
             "properties": {
-                "node_id": {"type": "keyword"},  # GNode specific field
+                "node_id": {"type": "keyword"},
                 "document_id": {"type": "keyword"},
-                "document_type": {"type": "keyword"},  # From Document
-                "text": {"type": "text"},  # From Document
-                "metadata": {  # From Document
-                    "type": "object",
-                    "properties": {
-                        "doctor_id": {"type": "keyword"},
-                        "country_id": {"type": "keyword"},
-                        "specialty_id": {"type": "keyword"},
-                        "created_at": {"type": "date"},
-                    },
-                },
-                "media": {  # From Document
-                    "type": "object",
-                    "properties": {
-                        "path": {"type": "keyword"},
-                        "ext": {"type": "keyword"},
-                    },
-                },
-                "media_metadata": {  # From Document
-                    "type": "object",
-                    "properties": {
-                        "title": {"type": "text"},
-                        "description_summary": {"type": "text"},
-                    },
-                },
-                "source": {  # From Document
-                    "type": "object",
-                    "properties": {
-                        "path": {"type": "keyword"},
-                        "ext": {"type": "keyword"},
-                    }
-                }
+                "document_type": {"type": "keyword"},
+                "text": {"type": "text", "analyzer": "english"},
+                "metadata": _METADATA,
+                "media": {"type": "object", "properties": {"path": {"type": "keyword"}, "ext": {"type": "keyword"}}},
+                "media_metadata": {"type": "object", "properties": {
+                    "title": {"type": "text"}, "description_summary": {"type": "text"}}},
+                "source": {"type": "object", "properties": {"path": {"type": "keyword"}, "ext": {"type": "keyword"}}},
             }
-        }
+        },
     }
 
 
 async def retriever_index_mappings() -> Dict[str, Any]:
-    """
-    Get the mapping configuration for retrieval indices.
-    """
+    """Mapping for retriever nodes: keyword-searchable text plus an HNSW vector."""
+    s = get_settings()
     return {
-        "settings": {
-            "number_of_shards": 1,
-            "number_of_replicas": 1,
-        },
+        "settings": _index_settings(),
         "mappings": {
             "properties": {
-                "gnode_id": {"type": "keyword"},  # RNode specific field
-                "text": {"type": "text"},  # From RNode
-                "clean_text": {"type": "text"},  # From RNode
+                "gnode_id": {"type": "keyword"},
+                "text": {"type": "text", "analyzer": "english"},
+                "clean_text": {"type": "text", "analyzer": "english"},
+                "metadata": _METADATA,
                 "vector": {
                     "type": "dense_vector",
-                    "dims": embedding_dimension,
+                    "dims": s.embedding.dimension,
                     "index": True,
-                    "similarity": "cosine",
-                    "index_options": {
-                        "type": "hnsw",
-                        "m": 16,  # Example parameter, adjust as needed
-                        "ef_construction": 128,  # Example parameter, adjust as needed
-                    }
-                }
+                    "similarity": s.index.similarity,
+                    "index_options": {"type": "hnsw", "m": s.index.hnsw_m, "ef_construction": s.index.hnsw_ef_construction},
+                },
             }
-        }
+        },
     }
 
 
+def index_names(country_id: str) -> Tuple[str, str]:
+    idx = get_settings().index
+    return idx.name(country_id, "generative"), idx.name(country_id, "retriever")
+
+
 async def create_index(es_client, country_id: str) -> Tuple[str, str]:
-    # Create index names with suffixes
-    index_name_gen = country_id.lower() + "_gen"
-    index_name_ret = country_id.lower() + "_ret"
-
-    # Check if the generation index already exists
-    if not es_client.indices.exists(index=index_name_gen):
-        gen_mappings = await generative_index_mappings()  # Await the coroutine to get the mappings
-        es_client.indices.create(index=index_name_gen, body=gen_mappings)
-        logger.info(f"Successfully created Elasticsearch index: {index_name_gen}")
-    else:
-        logger.info(f"Index '{index_name_gen}' already exists.")
-
-    # Check if the retrieval index already exists
-    if not es_client.indices.exists(index=index_name_ret):
-        ret_mappings = await retriever_index_mappings()  # This is not a coroutine, so no need to await
-        es_client.indices.create(index=index_name_ret, body=ret_mappings)
-        logger.info(f"Successfully created Elasticsearch index: {index_name_ret}")
-    else:
-        logger.info(f"Index '{index_name_ret}' already exists.")
-
-    return index_name_gen, index_name_ret
+    """Create the country's index pair if missing; returns (generative, retriever) names."""
+    gen, ret = index_names(country_id)
+    for name, mappings in ((gen, generative_index_mappings), (ret, retriever_index_mappings)):
+        if not es_client.indices.exists(index=name):
+            es_client.indices.create(index=name, body=await mappings())
+            logger.info(f"Created Elasticsearch index {name}")
+    return gen, ret
 
 
 async def drop_index(es_client, country_id: str) -> None:
-    """
-    Drop Elasticsearch indices based on country_id and specialty_id.
-
-    :param es_client: The Elasticsearch client instance.
-    :param country_id: The country ID used to construct the index names.
-    """
-    # Create index names with suffixes
-    index_name_gen = country_id.lower() + "_gen"
-    index_name_ret = country_id.lower() + "_ret"
-
-    # Attempt to delete both the generation and retrieval indices
-    for index_name in [index_name_gen, index_name_ret]:
-        if es_client.indices.exists(index=index_name):
-            es_client.indices.delete(index=index_name)
-            logger.info(f"Successfully deleted Elasticsearch index: {index_name}")
-        else:
-            logger.info(f"Index '{index_name}' does not exist and cannot be deleted.")
-
-
-import asyncio
+    """Delete the country's index pair (all doctors' knowledge for that country)."""
+    for name in index_names(country_id):
+        if es_client.indices.exists(index=name):
+            es_client.indices.delete(index=name)
+            logger.info(f"Deleted Elasticsearch index {name}")
 
 
 async def main():
-    # Initialize Elasticsearch client
-    _es_client = ElasticsearchClient().es_client()
-
-    # Define parameters for index creation
-    country_id = "us"
-
-    # Create indices for generation and retrieval
-    index_name_gen, index_name_ret = create_index(
-        es_client=_es_client,
-        country_id=country_id
-    )
-
-    # Log the names of the created indices
-    logger.info(f"Generation index name: {index_name_gen}")
-    logger.info(f"Retrieval index name: {index_name_ret}")
+    gen, ret = await create_index(ElasticsearchClient().es_client(), "us")
+    logger.info(f"Indices ready: {gen}, {ret}")
 
 
 if __name__ == "__main__":

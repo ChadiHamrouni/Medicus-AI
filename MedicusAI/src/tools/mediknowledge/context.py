@@ -11,9 +11,10 @@ from typing import Optional
 from medicus_common.core.database import db_manager
 from medicus_common.core.logging_config import logger
 
+from src.tools.mediknowledge.config.settings import get_settings
 from src.tools.mediknowledge.hybrid_search import hybrid_search
 
-EXCERPTS = 3
+EXCERPTS = get_settings().retrieval.context_excerpts   # [retrieval] in config/mediknowledge.toml
 
 _GUIDE = """# THE DOCTOR'S PUBLISHED INFORMATION (MediKnowledge)
 The doctor of this conversation published the documents below for their patients.
