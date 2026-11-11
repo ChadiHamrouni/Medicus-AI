@@ -21,6 +21,7 @@ Patients chat with an assistant that knows their health record. Doctors chart, p
 > Medicus is **not a medical device** and does not replace professional medical judgement. It ships with security controls for health data, but it is **not certified** for HIPAA, GDPR or any other regulatory regime out of the box. If you deploy it with real patients, compliance is your responsibility. See [Security](#security).
 
 ---
+https://github.com/user-attachments/assets/4534feea-35ff-4679-9552-c762688428fe
 
 ## Table of contents
 
