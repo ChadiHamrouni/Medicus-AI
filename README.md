@@ -102,6 +102,11 @@ docker compose up -d --build                          # database, migrations, se
 docker compose --profile demo run --rm seed-demo      # optional: demo doctor & patient
 ```
 
+Compose builds the backend images and installs the shared `MedicusCommon`
+package inside them; no separate package installation is needed for this
+workflow. For individual image builds, source-based backend development, or
+building the Expo app, see [Building from source](./BUILDING.md).
+
 | URL | What |
 |---|---|
 | `http://localhost:8080` | API gateway: point the mobile app here |
