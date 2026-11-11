@@ -31,6 +31,7 @@ Patients chat with an assistant that knows their health record. Doctors chart, p
 - [Features](#features)
 - [Quick start](#quick-start)
 - [Choosing a language model](#choosing-a-language-model)
+- [Doctor knowledge base (RAG)](#doctor-knowledge-base-rag)
 - [Running the mobile app](#running-the-mobile-app)
 - [Architecture](#architecture)
 - [Project structure](#project-structure)
@@ -213,6 +214,54 @@ Recordings are converted to 16 kHz mono WAV before transcription. A live voice t
 
 > **Live voice on one consumer GPU:** for answers within a few seconds, the speech model and the voice assistant model must both stay loaded. With Ollama, set `OLLAMA_MAX_LOADED_MODELS=2` and pick an `LLM_MODEL_VOICE` small enough to fit next to the speech model (for example `qwen3.5:4b` with `lfm3-omni` on 8 GB). If `LLM_MODEL_VOICE` is the speech model itself, keep `OLLAMA_MAX_LOADED_MODELS=1` so the main chat model gets the whole GPU. Very small models answer fast but may skip tool calls.
 
+> **Context length matters:** an assistant turn sends about 30,000 tokens (instructions plus every tool's schema; MediDoc has 35 tools). Ollama silently cuts longer prompts to its context window, and it divides that window between parallel requests (`OLLAMA_NUM_PARALLEL`, 2 by default). Set the context to **64k** (Ollama app settings or `OLLAMA_CONTEXT_LENGTH=65536`), or use 32k with `OLLAMA_NUM_PARALLEL=1`. With less, the model never sees its full instructions and tools: expect invented tool names, rejected arguments and answers that ignore the request. Check `server.log` for `truncating input prompt`.
+
+## Doctor knowledge base (RAG)
+
+**MediKnowledge** lets a doctor publish trusted material (how a procedure is done, preparation instructions, recovery, fees, insurance, clinic policies), and the doctor's assistant answers patients from it instead of from general knowledge. It lives in [`MedicusAI/src/tools/mediknowledge/`](MedicusAI/src/tools/mediknowledge/).
+
+**How a patient's question is answered**
+
+1. The doctor uploads a PDF, TXT or Markdown file, or pastes text: `POST /api/MedicusAI/knowledge/documents` (doctors only; also `GET` to list, `DELETE /{id}` to remove).
+2. The text is extracted, cleaned, split into overlapping chunks and stored in PostgreSQL (`knowledge.documents`, `knowledge.chunks`), with optional embeddings.
+3. On every patient turn in a conversation with that doctor, MedicusAI runs a **hybrid search** on the message (English full-text, prefix matching for other languages, and embedding similarity when configured, fused with reciprocal rank fusion) and adds the best excerpts to the assistant's context.
+4. The assistant answers from those excerpts and names the document. It can search again with the `search_doctor_knowledge` tool. If the material doesn't cover the question, it says so instead of guessing. The tool always searches the conversation's own doctor, never another doctor's material.
+
+| File | Role |
+|---|---|
+| `ingest.py` | extract → clean → chunk → embed → store, plus list and delete |
+| `hybrid_search.py` | full-text + prefix + vector search, fused with RRF |
+| `context.py` | adds the relevant excerpts to each patient turn |
+| `knowledge.py` | the `search_doctor_knowledge` agent tool (MediAid, and the doctor's own assistant) |
+
+It works without extra services: keyword search uses PostgreSQL alone. To also match by meaning, set an embedding model; any `/v1/embeddings` server works:
+
+```env
+EMBEDDING_MODEL=nomic-embed-text            # ollama pull nomic-embed-text
+EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1   # defaults to LLM_BASE_URL
+```
+
+**Elasticsearch ingestion pipeline**
+
+`mediknowledge/ingestion/` holds a richer, multi-stage pipeline (`extracting` → `parsing` → `insights` → `storing`). It extracts text, images and tables from PDFs, has the LLM write a title and summary for each passage, embeds small "retriever" chunks that point to larger "generative" passages, and indexes both in Elasticsearch per country (`<country>_gen`, `<country>_ret`). Searching it (`mediknowledge/es_search.py`) runs keyword (BM25) and vector (kNN) rankings over the retriever chunks, merges them with reciprocal rank fusion, and returns the generative passages; every query is filtered to one doctor. The assistant still uses the PostgreSQL index; switching it over is on the roadmap.
+
+```bash
+docker compose --profile elasticsearch up -d elasticsearch     # needs about 1 GB of RAM
+docker compose exec ai python -m src.tools.mediknowledge.cli ingest /path/guide.pdf --doctor 3 --country us --specialty 9
+docker compose exec ai python -m src.tools.mediknowledge.cli search "Do I need to fast before my echo?" --doctor 3 --country us
+docker compose exec ai python -m src.tools.mediknowledge.cli settings          # print the active settings
+docker compose exec ai python -m src.tools.mediknowledge.cli reset --country us
+```
+
+**Tuning.** Every hyperparameter of both pipelines (supported file types, chunk sizes and overlaps, embedding dimension and batch size, index shards, replicas, similarity and HNSW parameters, `top_k`, candidates, RRF constant, ingestion LLM settings) lives in one commented file, [`mediknowledge/config/mediknowledge.toml`](MedicusAI/src/tools/mediknowledge/config/mediknowledge.toml). It is validated at startup (`config/settings.py`); point `MEDIKNOWLEDGE_CONFIG` at another file to swap configurations per environment. Index-level changes (dimension, similarity, HNSW, shards) apply to new indices: run `reset` and re-ingest. Connection settings stay in the environment:
+
+```env
+ELASTICSEARCH_URL=http://elasticsearch:9200   # default
+EMBEDDING_DIMENSION=768                       # overrides the TOML; must match EMBEDDING_MODEL (nomic-embed-text: 768)
+KNOWLEDGE_BUCKET_ROOT=                        # where ingestion tracking files go; default STORAGE_LOCAL_PATH/knowledge
+MEDIKNOWLEDGE_CONFIG=                         # optional path to an alternative mediknowledge.toml
+```
+
 ## Running the mobile app
 
 The app is built with [Expo](https://expo.dev/) (React Native). It uses native modules (audio recording and playback), so it needs a **development build**; Expo Go is not enough.
@@ -220,10 +269,29 @@ The app is built with [Expo](https://expo.dev/) (React Native). It uses native m
 ```bash
 cd MediApp
 npm ci
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-Set `EXPO_PUBLIC_MEDICUS_API_BASE_URL` in `MediApp/.env` to the gateway as the device sees it:
+### Configuration
+
+The app contains no hard-coded server address or website. Everything it needs comes from `EXPO_PUBLIC_*` environment variables, read in one place: [`MediApp/utils/infrastructure/env.ts`](MediApp/utils/infrastructure/env.ts). Expo inlines these values into the bundle at build time, so:
+
+- **Local development:** put them in `MediApp/.env.local` (git-ignored). Restart Metro after changing it.
+- **EAS builds:** store them as EAS environment variables, one set per profile (`development`, `preview`, `production`, already mapped in `eas.json`):
+  ```bash
+  eas env:create --environment production --name EXPO_PUBLIC_MEDICUS_API_BASE_URL --value https://api.example.org --visibility plaintext
+  ```
+- **Never put secrets in `EXPO_PUBLIC_*` variables:** anyone can read them from the app. Keys for LLMs, databases or internal APIs belong to the backend only.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `EXPO_PUBLIC_MEDICUS_API_BASE_URL` | yes | API gateway; every service URL and Socket.IO derive from it |
+| `EXPO_PUBLIC_MEDICUS_{USER,CONVO,AI}_API_BASE_URL`, `EXPO_PUBLIC_MEDICUS_NOTIFICATION_API_URL`, `EXPO_PUBLIC_SOCKETIO_URL` | no | Per-service overrides, only for services not behind the gateway |
+| `EXPO_PUBLIC_WEBSITE_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_SUPPORT_EMAIL`, `EXPO_PUBLIC_APP_STORE_URL`, `EXPO_PUBLIC_PLAY_STORE_URL` | no | Links in Settings > About and Invite; hidden when unset |
+| `EXPO_PUBLIC_SENTRY_DSN` | no | Crash reporting |
+| `GOOGLE_MAPS_API_KEY`, `EXPO_OWNER`, `EAS_PROJECT_ID`, `APP_BUNDLE_ID` | no | Build-time only (read by `app.config.js`, not bundled) |
+
+Set `EXPO_PUBLIC_MEDICUS_API_BASE_URL` to the gateway as the device sees it:
 
 | Device | Base URL |
 |---|---|
@@ -397,7 +465,8 @@ These screens exist under `MediApp/app/tabs/settings/` but are not linked from t
 - [ ] Multi-page scanning with edge detection. "Scan" currently stores one camera photo in the vault (`MediApp/app/tabs/documents/index.tsx`).
 - [ ] A real content source for the **Feed** tab; it shows curated articles bundled with the app (`MediApp/app/tabs/feed/index.tsx`, images in `assets/images/feed/`).
 - [ ] Sample data for first-time users: example records, clearly labelled, on a user's own empty screens.
-- [ ] **MediKnowledge in the app:** a Doctor-tab screen to upload, list and delete knowledge documents (the API exists: `/api/MedicusAI/knowledge/documents`). Also support scanned PDFs (OCR with the vision model), DOCX, and `pgvector` for large libraries (`MedicusAI/src/tools/mediknowledge/`).
+- [ ] **MediKnowledge in the app:** a Doctor-tab screen to upload, list and delete knowledge documents (the API exists: `/api/MedicusAI/knowledge/documents`). Decide on one index for the assistant: the PostgreSQL index it searches today, or the Elasticsearch pipeline in `mediknowledge/ingestion/`. Also support scanned PDFs (OCR with the vision model), DOCX, and `pgvector` for large libraries (`MedicusAI/src/tools/mediknowledge/`).
+- [ ] **In-app notification inbox:** MedicusNotification sends push, email and SMS but keeps no per-user inbox. Add endpoints to list, mark read and delete a user's notifications, the matching client methods in `MediApp/services/notifications/medicusNotification.ts`, and an inbox screen.
 
 ### Platform
 
@@ -427,7 +496,9 @@ Please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-Medicus is licensed under the [Apache License 2.0](LICENSE).
+Medicus is licensed under the [Apache License 2.0](LICENSE): you may use, modify and distribute it, including commercially, as long as you keep the copyright and license notices and the [NOTICE](NOTICE) file, and state your changes. The license grants no rights to the Medicus name or logo.
+
+Medicus is not a certified medical device. It supports clinicians and patients but does not replace professional medical judgement; anyone deploying it is responsible for meeting the regulations that apply to them.
 
 ---
 
