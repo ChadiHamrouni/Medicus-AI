@@ -22,7 +22,7 @@ Patients chat with an assistant that knows their health record. Doctors chart, p
 
 ---
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/4534feea-35ff-4679-9552-c762688428fe" width="100%" controls></video>
+  <video src="https://github.com/user-attachments/assets/22c482c4-e532-4997-9add-552726aba9f9" width="100%" controls></video>
 </div>
 
 ## Table of contents
