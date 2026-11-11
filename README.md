@@ -412,10 +412,10 @@ Please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Main contributors
 
-- Yahia Boussaid
+- Yahia Boussaid [@yahbouss]
 - Ismail Hamdi
-- Firas HadjKacem
-- Shady Hamrouny
+- Firas HadjKacem 
+- Shady Hamrouny [@ChadiHamrouni]
 
 ## License
 
