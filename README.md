@@ -492,7 +492,7 @@ Be respectful and constructive in issues, reviews and discussions.
 ## Main contributors
 
 - Yahia Boussaid [@yahbouss](https://github.com/yahbouss)
-- Ismail Hamdi
+- Ismail Hamdi [@IsmailHamdi](https://github.com/ayokay123)
 - Firas HadjKacem 
 - Shady Hamrouny [@ChadiHamrouni](https://github.com/ChadiHamrouni)
 
