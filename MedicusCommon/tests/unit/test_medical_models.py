@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
+from medicus_common.models.common import MedicalProcedureDetails
 from medicus_common.models.convo.medibrief import MediBrief
 from medicus_common.models.medical.exams import MedicalExamOrder
 from medicus_common.models.medical.medications import MedicalPrescription, Medication
@@ -56,6 +57,14 @@ def test_prescription_needs_only_ids_and_medications():
 def test_prescription_still_requires_a_dosage():
     with pytest.raises(ValidationError):
         MedicalPrescription.model_validate({"patient_id": 1, "doctor_id": 1, "medications": [{"name": "Amlodipine"}]})
+
+
+# --- doctor profile -----------------------------------------------------------------------
+
+@pytest.mark.parametrize("price, stored", [(60.0, "60"), (42.5, "42.5"), ("60", "60")])
+def test_procedure_price_accepts_the_number_the_profile_returns(price, stored):
+    # GET /doctor/profile returns prices as numbers; writing the profile back must work.
+    assert MedicalProcedureDetails(procedure_name="Consultation", procedure_price=price).procedure_price == stored
 
 
 # --- bookings -----------------------------------------------------------------------------

@@ -94,7 +94,15 @@ class MedicalProcedureDetails(BaseModel):
     procedure_price: str  # The price of the procedure
     description: Optional[str] = None  # Description of the procedure
     duration_minutes: Optional[int] = None  # Duration in minutes
-    currency: Optional[str] = None  # Currency for this specific procedure  
+    currency: Optional[str] = None  # Currency for this specific procedure
+
+    @field_validator("procedure_price", mode="before")
+    @classmethod
+    def _price_as_text(cls, v):
+        # The profile endpoint returns prices as numbers; accept them back unchanged.
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return f"{v:g}"
+        return v
 
 class MedicalProceduresRequest(BaseModel):
     currency: Optional[str] = None  # Currency for the fees
