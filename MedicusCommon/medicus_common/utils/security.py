@@ -16,12 +16,6 @@ from typing import List, Union
 from medicus_common.core.constants import (
     ValidationConstants
 )
-from medicus_common.core import SecurityError, FileOperationError
-from medicus_common.core import get_logger
-
-from medicus_common.core.constants import (
-    ValidationConstants
-)
 from medicus_common.core.exceptions import SecurityError, FileOperationError
 from medicus_common.core.logging_config import get_logger
 

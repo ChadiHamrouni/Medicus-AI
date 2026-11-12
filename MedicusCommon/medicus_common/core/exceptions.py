@@ -5,6 +5,23 @@ class MedicusCommonException(Exception):
     """Base exception for MedicusCommon library."""
     pass
 
+class _DetailedError(MedicusCommonException):
+    """An error with a machine-readable code and context, safe to log."""
+
+    def __init__(self, message: str, error_code: str | None = None, details: dict | None = None):
+        super().__init__(message)
+        self.error_code = error_code
+        self.details = details or {}
+
+
+class SecurityError(_DetailedError):
+    """Rejected input: path traversal, malicious content, invalid input type."""
+
+
+class FileOperationError(_DetailedError):
+    """A file could not be read or processed."""
+
+
 class AuthenticationError(MedicusCommonException):
     """Raised when authentication fails."""
     pass

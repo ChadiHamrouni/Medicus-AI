@@ -82,7 +82,7 @@ class JWTHandler:
             Encoded JWT token
         """
         # Calculate expiration
-        if expires_delta:
+        if expires_delta is not None:   # timedelta(0) is falsy but is a real (immediate) expiry
             expire = datetime.now(timezone.utc) + expires_delta
         else:
             expire = datetime.now(timezone.utc) + timedelta(days=self.expiration_days)

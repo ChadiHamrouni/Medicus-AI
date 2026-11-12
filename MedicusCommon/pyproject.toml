@@ -44,7 +44,7 @@ azure = ["azure-storage-blob>=12.19", "aiohttp>=3.9", "azure-communication-email
 dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.6"]
 
 [project.urls]
-Homepage = "https://github.com/your-org/medicus"
+Homepage = "https://github.com/ChadiHamrouni/Medicus-AI"
 
 [tool.setuptools.packages.find]
 include = ["medicus_common*"]
@@ -54,3 +54,8 @@ medicus_common = ["py.typed", "core/*.json"]
 
 [tool.setuptools.exclude-package-data]
 "*" = [".env", "*.env"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
