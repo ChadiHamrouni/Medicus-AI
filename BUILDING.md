@@ -67,22 +67,50 @@ docker compose ps
 docker compose logs -f user convo ai notification gateway
 ```
 
-The API gateway is available at `http://localhost:8080` by default. To load
-sample doctor and patient accounts for local testing, run:
+The API gateway is available at `http://localhost:8080` by default (change it
+with `GATEWAY_PORT` in `.env`). To load sample doctor and patient accounts for
+local testing, run:
 
 ```sh
 docker compose --profile demo run --rm seed-demo
 ```
 
 Demo accounts are for local testing only. Do not load demo data into a
-production database. To run the repository's API smoke checks, use:
+production database. The seed is idempotent: running it again does nothing.
+
+Optional services are behind Compose profiles and only start when asked for:
+
+| Profile | Starts | Command |
+|---|---|---|
+| `demo` | the demo-data seed (one-off) | `docker compose --profile demo run --rm seed-demo` |
+| `ollama` | a local Ollama server | `docker compose --profile ollama up -d` |
+| `elasticsearch` | Elasticsearch for the MediKnowledge ingestion pipeline (about 1 GB RAM) | `docker compose --profile elasticsearch up -d elasticsearch` |
+
+See the root [README](./README.md#quick-start) for model setup and app
+configuration.
+
+## Verify the build
+
+Run the end-to-end tests against the stack you just started:
 
 ```sh
-python scripts/smoke_test.py
+./scripts/e2e.sh
 ```
 
-See the root [README](./README.md#quick-start) for model setup, app
-configuration, and additional test commands.
+The script starts any missing services, loads the demo data and runs
+`pytest tests/e2e` (164 tests, no LLM needed). On Windows, run it from Git Bash
+or WSL, or run the same steps yourself:
+
+```sh
+docker compose up -d --wait postgres redis mailpit user convo ai notification gateway
+docker compose --profile demo run --rm seed-demo
+python -m pip install -r tests/e2e/requirements.txt
+python -m pytest tests/e2e
+```
+
+Arguments after `./scripts/e2e.sh` go to pytest, for example `-k security` or
+`-m llm` for the opt-in tests that use your configured model. See
+[Testing](./README.md#testing) for the unit tests and what each suite checks.
 
 ## Build one backend image
 
@@ -182,16 +210,28 @@ From the app directory:
 ```sh
 cd MediApp
 npm ci
+cp .env.example .env.local
 ```
 
-Set `EXPO_PUBLIC_MEDICUS_API_BASE_URL` in `MediApp/.env` to the gateway URL as
-seen by the device. `localhost` works only when the app and gateway share the
-same host network; for a physical device use the computer's LAN IP, and for the
-Android emulator use `http://10.0.2.2:8080`. `EXPO_PUBLIC_*` values are bundled
-into the app and are visible to users; never put API keys or other secrets in
-them.
+Set `EXPO_PUBLIC_MEDICUS_API_BASE_URL` in `MediApp/.env.local` (git-ignored) to
+the gateway URL as seen by the device. `localhost` works only when the app and
+gateway share the same host network; for a physical device use the computer's
+LAN IP, and for the Android emulator use `http://10.0.2.2:8080`. Every other
+service URL derives from this one. All app settings are read in
+`MediApp/utils/infrastructure/env.ts`; the optional ones (website, terms,
+privacy, support email, store links) hide their screen entries when unset.
+`EXPO_PUBLIC_*` values are bundled into the app and are visible to users; never
+put API keys or other secrets in them. Restart Metro after changing them.
 
-With the required native toolchain installed, create a local development build:
+Check that the dependencies match the Expo SDK:
+
+```sh
+npx expo-doctor
+```
+
+Android builds need **JDK 17**; newer JDKs are not supported by the project's
+Gradle version. With the required native toolchain installed, create a local
+development build:
 
 ```sh
 npx expo run:android
@@ -199,10 +239,13 @@ npx expo run:android
 npx expo run:ios
 ```
 
-For EAS builds, configure the EAS project and production API URL in the
-appropriate EAS environment, then use the committed profiles in `eas.json`:
+For EAS builds, set `EXPO_OWNER`, `EAS_PROJECT_ID` and `APP_BUNDLE_ID` (read by
+`app.config.js` at build time), and store the `EXPO_PUBLIC_*` values as EAS
+environment variables. Each profile in `eas.json` uses the EAS environment of
+the same name (`development`, `preview`, `production`):
 
 ```sh
+npx eas-cli env:create --environment production --name EXPO_PUBLIC_MEDICUS_API_BASE_URL --value https://api.example.org --visibility plaintext
 npx eas-cli build --profile preview --platform android
 npx eas-cli build --profile production --platform all
 ```

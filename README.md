@@ -86,8 +86,8 @@ Most AI health assistants are closed products that send your data to a single ve
 **Prerequisites:** [Docker](https://docs.docker.com/get-docker/) with Compose v2, about 4 GB of free RAM, and either an API key for a hosted model or [Ollama](https://ollama.com/) for a local one.
 
 ```bash
-git clone https://github.com/<your-org>/medicus.git
-cd medicus
+git clone https://github.com/ChadiHamrouni/Medicus-AI.git
+cd Medicus-AI
 cp .env.example .env
 ```
 
@@ -126,7 +126,7 @@ building the Expo app, see [Building from source](./BUILDING.md).
 Check that everything works:
 
 ```bash
-python scripts/smoke_test.py      # 43 security & API checks, no LLM needed
+./scripts/e2e.sh                  # 164 end-to-end tests, no LLM needed
 ```
 
 ## Choosing a language model
@@ -169,7 +169,7 @@ LLM_SUPPORTS_VISION=false
 ```
 
 > [!TIP]
-> **Raise Ollama's context window to at least 32K tokens** (Ollama settings, or `OLLAMA_CONTEXT_LENGTH=32768`). The default of 4K is far too small: the doctor assistant's prompt, with its tools, is around 30K tokens, and Ollama **silently truncates** anything longer.
+> **Raise Ollama's context window to 64K tokens** (Ollama settings, or `OLLAMA_CONTEXT_LENGTH=65536`). The default of 4K is far too small: the doctor assistant's prompt, with its tools, is around 30K tokens, and Ollama **silently truncates** anything longer. See *Context length matters* below.
 >
 > Set `LLM_REASONING_EFFORT=none` for "thinking" models (Qwen 3, DeepSeek-R1, gpt-oss). Otherwise their hidden reasoning can use up the whole output budget and the reply comes back empty.
 
@@ -287,7 +287,7 @@ The app contains no hard-coded server address or website. Everything it needs co
 |---|---|---|
 | `EXPO_PUBLIC_MEDICUS_API_BASE_URL` | yes | API gateway; every service URL and Socket.IO derive from it |
 | `EXPO_PUBLIC_MEDICUS_{USER,CONVO,AI}_API_BASE_URL`, `EXPO_PUBLIC_MEDICUS_NOTIFICATION_API_URL`, `EXPO_PUBLIC_SOCKETIO_URL` | no | Per-service overrides, only for services not behind the gateway |
-| `EXPO_PUBLIC_WEBSITE_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_SUPPORT_EMAIL`, `EXPO_PUBLIC_APP_STORE_URL`, `EXPO_PUBLIC_PLAY_STORE_URL` | no | Links in Settings > About and Invite; hidden when unset |
+| `EXPO_PUBLIC_WEBSITE_URL`, `EXPO_PUBLIC_TERMS_URL`, `EXPO_PUBLIC_PRIVACY_URL`, `EXPO_PUBLIC_SUPPORT_EMAIL`, `EXPO_PUBLIC_APP_STORE_URL`, `EXPO_PUBLIC_PLAY_STORE_URL` | no | Links and support contact in Settings > About, Help and Invite; hidden when unset |
 | `EXPO_PUBLIC_SENTRY_DSN` | no | Crash reporting |
 | `GOOGLE_MAPS_API_KEY`, `EXPO_OWNER`, `EAS_PROJECT_ID`, `APP_BUNDLE_ID` | no | Build-time only (read by `app.config.js`, not bundled) |
 
@@ -356,8 +356,8 @@ medicus/
 │   ├── seeds/                # reference data + optional demo data
 │   └── tests/smoke.sql       # schema smoke test
 ├── deploy/nginx/             # API gateway configuration
-├── scripts/                  # smoke_test.py, e2e.sh
-├── tests/e2e/                # end-to-end suites (API sweep, tools, agent loop, real-LLM chat)
+├── scripts/e2e.sh            # start the stack, load demo data, run tests/e2e
+├── tests/e2e/                # end-to-end tests: API, security, assistant tools, agent loop, real LLM
 ├── docker-compose.yml
 └── .env.example              # every configuration option, documented
 ```
@@ -394,15 +394,25 @@ To change the schema, add a new file `database/migrations/YYYYMMDDHHMMSS_descrip
 
 ## Testing
 
+Unit tests live next to the code they test (`<Service>/tests`); suites that need the whole stack live in the root `tests/` folder.
+
 | Command | What it covers | Needs an LLM? |
 |---|---|---|
-| `python scripts/smoke_test.py` | 43 checks: auth, authorization (IDOR), uploads, signed links, notifications, gateway rules | No |
-| `./scripts/e2e.sh` | Smoke test + every User/Convo/AI endpoint + all assistant tools against the database + a full agent turn against a mock LLM | No |
-| `python tests/e2e/real_llm_chat.py` | Real assistant conversations (records, booking, charting, prompt injection) against your configured model | Yes |
+| `cd MedicusCommon && pip install -e ".[dev,ai]" && pytest` | 73 unit tests: LLM settings and tool-call repair, tokens and passwords, path/filename/input safety, the medical input models the tools receive | No |
+| `cd MedicusNotification && python -m pytest tests` | 55 unit tests: notification creation, idempotency, quiet hours, worker, event handling | No |
+| `./scripts/e2e.sh` | 164 end-to-end tests against the running stack (below) | No |
+| `./scripts/e2e.sh -m llm` | 77 real assistant turns: each tool triggered by a natural request, ID leaks, prompt injection | Yes |
 | `psql -f database/tests/smoke.sql` | Every view compiles, fuzzy search, the double-booking constraint | No |
 
-The end-to-end suites expect the demo data to be loaded.
+`scripts/e2e.sh` starts the stack, loads the demo data and runs `pytest tests/e2e`; extra arguments go to pytest (`-k security`, `-x`). With a stack already running, `pip install -r tests/e2e/requirements.txt && pytest tests/e2e` does the same; `E2E_BASE_URL` points it at another gateway. If the stack is not reachable, the tests are skipped with the reason.
 
+| File | What it checks |
+|---|---|
+| `test_api_endpoints.py` | Every User, Convo and AI endpoint the apps call, as the demo patient and doctor; profile writes round-trip unchanged |
+| `test_security.py` | Login and registration rules, verification-code lockout, IDOR on records, conversations, attachments and the document vault, signed links, internal APIs hidden by the gateway, refresh and logout |
+| `test_assistant_tools.py` | Every assistant tool against the demo database, in all four conversation types, including double-booking and spoofed patient/doctor ids |
+| `test_agent_mock_llm.py` | A full turn (agent → tool → answer) in each conversation type against a mock LLM; client-sent history never reaches the model |
+| `test_agent_real_llm.py` | Opt-in (`-m llm`): the real model picks the right tool for each request and refuses prompt injection |
 ## Security
 
 Medicus handles protected health information, so security is built into the architecture:
@@ -467,25 +477,17 @@ These screens exist under `MediApp/app/tabs/settings/` but are not linked from t
 - [ ] Sample data for first-time users: example records, clearly labelled, on a user's own empty screens.
 - [ ] **MediKnowledge in the app:** a Doctor-tab screen to upload, list and delete knowledge documents (the API exists: `/api/MedicusAI/knowledge/documents`). Decide on one index for the assistant: the PostgreSQL index it searches today, or the Elasticsearch pipeline in `mediknowledge/ingestion/`. Also support scanned PDFs (OCR with the vision model), DOCX, and `pgvector` for large libraries (`MedicusAI/src/tools/mediknowledge/`).
 - [ ] **In-app notification inbox:** MedicusNotification sends push, email and SMS but keeps no per-user inbox. Add endpoints to list, mark read and delete a user's notifications, the matching client methods in `MediApp/services/notifications/medicusNotification.ts`, and an inbox screen.
-
-### Platform
-
-- [ ] Web dashboard for doctors
-- [ ] FHIR import and export
-- [ ] Helm chart for Kubernetes
-- [ ] More languages in the assistants and the app
-
-Have an idea? [Open a discussion](../../discussions) or upvote an existing issue.
+- [ ] **Bring the service test suites up to date:** the MedicusAI unit tests call tools as plain functions (they are Agents SDK `FunctionTool`s now) and two import functions that no longer exist; most MedicusUser and MedicusConvo tests are integration tests that expect a database and fixtures they do not set up. Fix them so every service can be tested with one command. MediApp also needs a test runner (`jest-expo`).
 
 ## Contributing
 
-Contributions of every size are welcome: bug reports, documentation, translations, new tools for the assistants, new storage or notification providers.
+Contributions are welcome: code, documentation, translations and bug reports.
 
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup and conventions.
-2. Look for issues labelled **good first issue**.
-3. Open a pull request. Run `./scripts/e2e.sh` before you submit.
+2. Pick an item from the [Roadmap](#roadmap) or an issue labelled **good first issue**, and say in the issue that you are working on it.
+3. Open a pull request. Run the unit tests and `./scripts/e2e.sh` before you submit.
 
-Please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+Be respectful and constructive in issues, reviews and discussions.
 
 ## Main contributors
 

@@ -23,6 +23,9 @@ service-account*.json
 google-services.json
 GoogleService-Info.plist
 
+# --- CI (not published yet) ----------------------------------------------------
+/.github/workflows/
+
 # --- AI coding-assistant files -------------------------------------------------
 CLAUDE.md
 CLAUDE.local.md
@@ -67,8 +70,9 @@ CACHEDIR.TAG
 /Include/
 /include/
 /Scripts/*
-!/Scripts/smoke_test.py
+/scripts/*
 !/Scripts/e2e.sh
+!/scripts/e2e.sh
 /share/
 # Any other virtualenv content, wherever it lives
 **/site-packages/
@@ -121,7 +125,7 @@ Thumbs.db
 docker-compose.legacy.yml
 
 # Legacy per-service test suites: bound to a private database and contain
-# credentials. Superseded by tests/e2e and scripts/smoke_test.py.
+# credentials. Superseded by tests/e2e (run with scripts/e2e.sh).
 /MedicusUser/tests/
 /MedicusConvo/tests/
 /MedicusAI/tests/
