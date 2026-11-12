@@ -54,6 +54,25 @@ Add tests with your change: unit tests next to the code (`<Service>/tests`),
 and end-to-end tests in `tests/e2e` when the change crosses services. A bug fix
 should come with a test that fails without it.
 
+### Run focused end-to-end tests
+
+Run the helper from the repository root with Docker running, Python 3.10+
+available as `python`, and a configured `.env`. It starts the services, loads
+the demo data, and forwards arguments to pytest:
+
+```sh
+./scripts/e2e.sh -k security -x
+```
+
+The default suite excludes tests marked `llm`. To run real-model tests, configure
+the model in `.env` and opt in with `./scripts/e2e.sh -m llm`.
+
+If the stack and demo data are already ready, run
+`python -m pytest tests/e2e -k security -x` directly after installing
+`tests/e2e/requirements.txt`. Check the skip reasons in the pytest summary:
+an unreachable stack or missing demo data can cause tests to skip, so a run
+with skipped tests does not verify those scenarios.
+
 ## Open a pull request
 
 - One topic per pull request; keep it small enough to review.
