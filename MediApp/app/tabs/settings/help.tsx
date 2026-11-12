@@ -4,6 +4,7 @@ import React from 'react';
 import { Linking, Pressable, Text, TouchableOpacity, View } from 'react-native';
 import { StandardScreenLayout } from '@/components/shared/layout/StandardScreenLayout';
 import { InfoNotice } from '@/components/shared/ui';
+import { env } from '@/utils/infrastructure/env';
 
 interface HelpItem {
   id: string;
@@ -16,14 +17,13 @@ interface HelpItem {
 const HelpSettings: React.FC = () => {
   const router = useRouter();
 
-  const handleContactSupport = () => {
-    Linking.openURL(
-      'mailto:support@mediapp.com?subject=MediApp Support Request'
-    );
-  };
+  // Support contact comes from EXPO_PUBLIC_SUPPORT_EMAIL; the entry is hidden when it is not set.
+  const supportEmail = env.supportEmail;
 
-  const handlePhoneSupport = () => {
-    Linking.openURL('tel:+1-555-000-0000'); // Placeholder number
+  const handleContactSupport = () => {
+    if (supportEmail) {
+      Linking.openURL(`mailto:${supportEmail}?subject=Medicus Support Request`);
+    }
   };
 
   const handleLiveChat = () => {};
@@ -44,13 +44,6 @@ const HelpSettings: React.FC = () => {
       description: 'Send us a detailed message',
       icon: 'email',
       action: handleContactSupport,
-    },
-    {
-      id: 'phone_support',
-      title: 'Phone Support',
-      description: 'Call our support team (Mon-Fri, 9am-5pm EST)',
-      icon: 'phone',
-      action: handlePhoneSupport,
     },
     {
       id: 'live_chat',
@@ -75,7 +68,9 @@ const HelpSettings: React.FC = () => {
             </Text>
           </View>
 
-          {helpItems.filter(item => item.id !== 'live_chat').map((item, index) => {
+          {helpItems
+            .filter(item => item.id !== 'live_chat' && (item.id !== 'email_support' || supportEmail))
+            .map((item, index) => {
             const isDisabled = item.id === 'live_chat';
 
             return (
@@ -173,15 +168,15 @@ const HelpSettings: React.FC = () => {
         </View>
 
         {/* Contact Information */}
-        <View className="mx-4 mt-4">
-          <InfoNotice
-            title="Medicus Support"
-            message={
-              '📧 support@mediapp.com\n📞 1-555-000-0000\n🕒 Monday - Friday, 9:00 AM - 5:00 PM EST'
-            }
-            iconName="information"
-          />
-        </View>
+        {supportEmail && (
+          <View className="mx-4 mt-4">
+            <InfoNotice
+              title="Medicus Support"
+              message={`📧 ${supportEmail}`}
+              iconName="information"
+            />
+          </View>
+        )}
 
         {/* Bottom spacing */}
         <View className="h-8" />
